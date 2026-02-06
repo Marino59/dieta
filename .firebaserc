@@ -1,0 +1,13 @@
+{
+  "projects": {},
+  "targets": {
+    "sentieri-cortina-web-app": {
+      "hosting": {
+        "dieta-site": [
+          "dietapersonale-marin"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

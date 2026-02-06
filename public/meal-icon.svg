@@ -1,0 +1,7 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Fork -->
+  <path d="M35 85 L35 45 M25 25 Q25 45 35 45 Q45 45 45 25 M25 25 L25 10 M35 45 L35 10 M45 25 L45 10" transform="rotate(-15, 50, 50) translate(-10, 0)" />
+  
+  <!-- Knife -->
+  <path d="M65 85 L65 45 M65 45 L65 10 Q75 10 75 45 Q75 45 65 45" transform="rotate(15, 50, 50) translate(10, 0)" />
+</svg>

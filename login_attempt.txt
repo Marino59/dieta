@@ -1,0 +1,24 @@
+﻿[36m[1mi [22m[39m The Firebase CLIÔÇÖs MCP server feature can optionally make use of Gemini in Firebase. Learn more about Gemini in Firebase and how it uses your data: https://firebase.google.com/docs/gemini-in-firebase#how-gemini-in-firebase-uses-your-data
+[34m?[39m [1mEnable Gemini in Firebase features?[22m [2m(Y/n)[22m[45G[46G[2K[G[34m?[39m [1mEnable Gemini in Firebase features?[22m [2m(Y/n)[22m n[46G[45G[2K[G[32mÔ£ö[39m [1mEnable Gemini in Firebase features?[22m [36mNo[39m[41G
+[?25h
+[36m[1mi [22m[39m Firebase optionally collects CLI and Emulator Suite usage and error reporting information to help improve our products. Data is collected in accordance with Google's privacy policy (https://policies.google.com/privacy) and is not used to identify you.
+[34m?[39m [1mAllow Firebase to collect CLI and Emulator Suite usage and error reporting [22m
+[1minformation?[22m [2m(Y/n)[22m[1A[97G[98G[1B[2K[1A[2K[G[34m?[39m [1mAllow Firebase to collect CLI and Emulator Suite usage and error reporting [22m
+[1minformation?[22m [2m(Y/n)[22m n[1A[98G[97G[1B[2K[1A[2K[G[32mÔ£ö[39m [1mAllow Firebase to collect CLI and Emulator Suite usage and error reporting [22m
+[1minformation?[22m [36mNo[39m[1A[93G[1B
+[?25h
+To sign in to the Firebase CLI:
+
+1. Take note of your session ID:
+
+   [1m8550F[22m
+
+2. Visit the URL below on any device and follow the instructions to get your code:
+
+   https://auth.firebase.tools/login?code_challenge=mi8YzJMgJxOwtvme6FnTPzhFB1PQ7GoDDgWnB-iNL7M&session=8550f393-2f97-4dc1-a18e-0d91b4d2bb79&attest=5YpkwTQ04QwosAvVSRronr3iPMVFsSF7nbtuTw67UlQ
+
+3. Paste or enter the authorization code below once you have it:
+
+[34m?[39m [1mEnter authorization code:[22m[29G
+[?25h
+[1m[31mError:[39m[22m An unexpected error has occurred.
