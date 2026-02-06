@@ -4,7 +4,11 @@ import { AuthContextProvider } from "@/lib/auth-context";
 export const metadata = {
   title: "Dieta",
   description: "Monitora la tua nutrizione con l'AI",
-  manifest: "/manifest.json",
+  manifest: "/manifest.json?v=2",
+  icons: {
+    icon: "/globe.svg",
+    apple: "/globe.svg",
+  },
 };
 
 export const viewport = {

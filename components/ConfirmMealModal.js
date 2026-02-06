@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+
 import { Check, X, Minus, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { updateAnalysisFromText } from '@/lib/ai';
 
@@ -72,116 +72,112 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
     if (!mounted) return null;
 
     // The actual modal JSX
-    const modalContent = (
-        <div
-            className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6"
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
-        >
-            <div className="bg-slate-900/90 border border-slate-700/50 w-full max-w-lg max-h-[85vh] rounded-3xl flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+    return (
+        <div className="fixed inset-0 z-[99999] bg-slate-950 flex flex-col animate-in zoom-in-95 duration-200">
 
-                {/* Header */}
-                <div className="p-5 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/30">
-                    <div>
-                        <h3 className="text-xl font-bold text-white tracking-tight">Modifica Pasto</h3>
-                        <p className="text-slate-400 text-xs font-medium">Aggiorna i dettagli nutrizionali</p>
-                    </div>
-                    <button
-                        onClick={onCancel}
-                        className="p-2.5 bg-slate-800/80 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-colors border border-slate-700/50"
-                    >
-                        <X size={20} />
-                    </button>
-                </div>
+            {/* Header */}
+            <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
+                <button
+                    onClick={onCancel}
+                    className="p-4 bg-slate-800 rounded-full text-slate-400 hover:text-white transition active:scale-95"
+                >
+                    <X size={32} />
+                </button>
+                <span className="text-slate-400 font-bold uppercase tracking-widest text-sm">Conferma Pasto</span>
+                <div className="w-12" /> {/* Spacer for centering */}
+            </div>
 
-                {/* Body */}
-                <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 pb-40">
+                <div className="flex flex-col gap-12 max-w-xl mx-auto h-full justify-center">
 
                     {/* Main Title & Quantity */}
-                    <div className="text-center space-y-4">
-                        <div className="text-2xl font-bold text-white leading-tight">{mealData.name}</div>
+                    <div className="text-center space-y-10 mt-4">
+                        <textarea
+                            value={mealData.name}
+                            readOnly
+                            className="w-full bg-transparent text-5xl sm:text-7xl font-black text-white text-center outline-none resize-none overflow-hidden"
+                            rows={mealData.name.length > 20 ? 3 : 2}
+                            style={{ lineHeight: '1.1' }}
+                        />
 
-                        <div className="flex items-center justify-center gap-6 bg-slate-800/30 p-3 rounded-2xl border border-slate-700/30 mx-auto max-w-[280px]">
+                        <div className="flex items-center justify-center gap-6 sm:gap-10">
                             <button
                                 onClick={() => handleQuantityChange(-50)}
-                                className="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-white transition active:scale-95 border border-slate-700"
+                                className="w-20 h-20 rounded-3xl bg-slate-800 flex items-center justify-center text-white active:scale-90 transition shadow-lg shadow-black/20"
                             >
-                                <Minus size={20} />
+                                <Minus size={40} />
                             </button>
-                            <div className="flex flex-col items-center min-w-[80px]">
-                                <span className="text-3xl font-black text-blue-400">{quantity}</span>
-                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">GRAMMI</span>
+
+                            <div className="flex flex-col items-center min-w-[160px]">
+                                <span className="text-7xl sm:text-8xl font-black text-blue-400 tracking-tighter">{quantity}</span>
+                                <span className="text-lg text-slate-500 font-bold uppercase tracking-[0.3em] mt-2">GRAMMI</span>
                             </div>
+
                             <button
                                 onClick={() => handleQuantityChange(50)}
-                                className="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-white transition active:scale-95 border border-slate-700"
+                                className="w-20 h-20 rounded-3xl bg-slate-800 flex items-center justify-center text-white active:scale-90 transition shadow-lg shadow-black/20"
                             >
-                                <Plus size={20} />
+                                <Plus size={40} />
                             </button>
                         </div>
                     </div>
 
-                    {/* DateTime Section */}
+                    {/* Macros Grid - 2x2 for better visibility */}
+                    <div className="grid grid-cols-2 gap-4 sm:gap-6 flex-1 content-center">
+                        <MacroBox label="CALORIE" val={Math.round((mealData.calories / 100) * quantity)} unit="kcal" color="text-white" border="bg-slate-900 border-slate-800" h="h-48 sm:h-56" size="text-6xl sm:text-7xl" />
+                        <MacroBox label="PROTEINE" val={Math.round((mealData.protein / 100) * quantity)} unit="g" color="text-blue-400" border="bg-blue-950/30 border-blue-900/50" h="h-48 sm:h-56" size="text-6xl sm:text-7xl" />
+                        <MacroBox label="CARB." val={Math.round((mealData.carbs / 100) * quantity)} unit="g" color="text-emerald-400" border="bg-emerald-950/30 border-emerald-900/50" h="h-48 sm:h-56" size="text-6xl sm:text-7xl" />
+                        <MacroBox label="GRASSI" val={Math.round((mealData.fat / 100) * quantity)} unit="g" color="text-amber-400" border="bg-amber-950/30 border-amber-900/50" h="h-48 sm:h-56" size="text-6xl sm:text-7xl" />
+                    </div>
+
+                    {/* DateTime Section - Replaced with big buttons */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-800/40 p-3 rounded-2xl border border-slate-700/30">
-                            <label className="text-[10px] text-slate-400 font-bold uppercase mb-2 block tracking-wider">Data</label>
+                        <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col gap-2">
                             <input
                                 type="date"
                                 value={selectedDateStr}
                                 onChange={e => setSelectedDateStr(e.target.value)}
-                                className="w-full bg-slate-700/50 text-white text-sm font-medium rounded-lg px-2 py-1 outline-none cursor-pointer [color-scheme:dark]"
+                                className="bg-transparent text-white text-2xl font-bold outline-none w-full text-center h-full"
                             />
                         </div>
-                        <div className="bg-slate-800/40 p-3 rounded-2xl border border-slate-700/30">
-                            <label className="text-[10px] text-slate-400 font-bold uppercase mb-2 block tracking-wider">Ora</label>
+                        <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col gap-2">
                             <input
                                 type="time"
                                 value={selectedTimeStr}
                                 onChange={e => setSelectedTimeStr(e.target.value)}
-                                className="w-full bg-slate-700/50 text-white text-sm font-medium rounded-lg px-2 py-1 outline-none cursor-pointer [color-scheme:dark]"
+                                className="bg-transparent text-white text-2xl font-bold outline-none w-full text-center h-full"
                             />
                         </div>
                     </div>
-
-                    {/* Macros Grid */}
-                    <div className="grid grid-cols-4 gap-2">
-                        <MacroBox label="KCAL" val={Math.round((mealData.calories / 100) * quantity)} color="text-white" border="bg-slate-800/50 border-slate-700" />
-                        <MacroBox label="PROT" val={Math.round((mealData.protein / 100) * quantity)} color="text-blue-400" border="bg-blue-500/10 border-blue-500/20" />
-                        <MacroBox label="CARB" val={Math.round((mealData.carbs / 100) * quantity)} color="text-emerald-400" border="bg-emerald-500/10 border-emerald-500/20" />
-                        <MacroBox label="GRAS" val={Math.round((mealData.fat / 100) * quantity)} color="text-amber-400" border="bg-amber-500/10 border-amber-500/20" />
-                    </div>
-
                 </div>
+            </div>
 
-                {/* Footer */}
-                <div className="p-5 border-t border-slate-700/50 bg-slate-800/30 flex flex-col gap-3">
+            {/* Footer */}
+            <div className="p-6 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 absolute bottom-0 left-0 right-0 z-20">
+                <div className="max-w-xl mx-auto">
                     <button
                         onClick={handleSave}
                         disabled={isLoading}
-                        className="w-full h-14 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold text-lg shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale"
+                        className="w-full h-24 rounded-[2rem] bg-white text-black font-black text-3xl tracking-tight shadow-xl shadow-white/10 active:scale-[0.98] transition-all flex items-center justify-center gap-4 disabled:opacity-50"
                     >
-                        {isLoading ? <Loader2 className="animate-spin w-6 h-6" /> : <Check size={24} strokeWidth={3} />}
-                        {isLoading ? 'SALVATAGGIO...' : 'SALVA MODIFICHE'}
-                    </button>
-
-                    <button
-                        onClick={onCancel}
-                        className="text-xs text-slate-500 hover:text-slate-300 transition-colors font-medium py-2"
-                    >
-                        Annulla
+                        {isLoading ? <Loader2 className="animate-spin w-10 h-10" /> : <Check size={40} strokeWidth={4} />}
+                        {isLoading ? 'SALVATAGGIO...' : 'CONFERMA'}
                     </button>
                 </div>
             </div>
         </div>
     );
 
-    return createPortal(modalContent, document.body);
+
 }
 
-function MacroBox({ label, val, color, border }) {
+function MacroBox({ label, val, unit, color, border, h, size }) {
     return (
-        <div className={`flex flex-col items-center justify-center py-3 rounded-2xl border ${border} transition hover:scale-105`}>
-            <span className="text-[9px] font-black text-slate-500 tracking-widest mb-0.5">{label}</span>
-            <span className={`text-sm font-black ${color}`}>{val}</span>
+        <div className={`flex flex-col items-center justify-center ${h} rounded-[2rem] border-2 ${border} transition hover:scale-[1.02]`}>
+            <span className={`leading-none font-black ${color} ${size}`}>{val}</span>
+            <span className={`text-xl font-bold opacity-60 mt-2 ${color}`}>{unit}</span>
+            <span className="text-xs font-black text-slate-500 tracking-[0.3em] mt-4 uppercase">{label}</span>
         </div>
     );
 }
