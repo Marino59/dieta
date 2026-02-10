@@ -242,7 +242,7 @@ export default function CameraInput({ onMealAdded, onMealIdentified, hideButtons
                         <textarea
                             autoFocus
                             placeholder="Cosa hai mangiato?&#10;Es: 2 uova strapazzate con pane tostato..."
-                            className="w-full h-48 bg-slate-800/50 border-2 border-orange-500/30 rounded-3xl p-6 text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors resize-none mb-4"
+                            className="w-full h-48 bg-white dark:bg-slate-900 border-4 border-orange-500/50 rounded-3xl p-6 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors resize-none mb-4 shadow-inner"
                             style={{ fontSize: '1.5rem', lineHeight: '1.5' }} // Large Text
                             value={textDescription}
                             onChange={(e) => setTextDescription(e.target.value)}

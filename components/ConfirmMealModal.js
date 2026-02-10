@@ -41,6 +41,12 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
         setQuantity(prev => Math.max(10, prev + delta));
     };
 
+    const setNow = () => {
+        const now = new Date();
+        setSelectedDateStr(now.toISOString().split('T')[0]);
+        setSelectedTimeStr(now.toTimeString().slice(0, 5));
+    };
+
     const handleSave = () => {
         if (isLoading) return;
         const [year, month, day] = selectedDateStr.split('-').map(Number);
@@ -88,11 +94,11 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 pb-40">
-                <div className="flex flex-col gap-12 max-w-xl mx-auto h-full justify-center">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                <div className="flex flex-col gap-12 max-w-xl mx-auto">
 
                     {/* Main Title & Quantity */}
-                    <div className="text-center space-y-10 mt-4">
+                    <div className="text-center space-y-10 mt-8">
                         <textarea
                             value={mealData.name}
                             readOnly
@@ -124,46 +130,55 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
                     </div>
 
                     {/* Macros Grid - 2x2 for better visibility */}
-                    <div className="grid grid-cols-2 gap-4 sm:gap-6 flex-1 content-center">
+                    <div className="grid grid-cols-2 gap-4 sm:gap-6">
                         <MacroBox label="CALORIE" val={Math.round((mealData.calories / 100) * quantity)} unit="kcal" color="text-white" border="bg-slate-900 border-slate-800" h="h-48 sm:h-56" size="text-6xl sm:text-7xl" />
                         <MacroBox label="PROTEINE" val={Math.round((mealData.protein / 100) * quantity)} unit="g" color="text-blue-400" border="bg-blue-950/30 border-blue-900/50" h="h-48 sm:h-56" size="text-6xl sm:text-7xl" />
                         <MacroBox label="CARB." val={Math.round((mealData.carbs / 100) * quantity)} unit="g" color="text-emerald-400" border="bg-emerald-950/30 border-emerald-900/50" h="h-48 sm:h-56" size="text-6xl sm:text-7xl" />
                         <MacroBox label="GRASSI" val={Math.round((mealData.fat / 100) * quantity)} unit="g" color="text-amber-400" border="bg-amber-950/30 border-amber-900/50" h="h-48 sm:h-56" size="text-6xl sm:text-7xl" />
                     </div>
 
-                    {/* DateTime Section - Replaced with big buttons */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col gap-2">
-                            <input
-                                type="date"
-                                value={selectedDateStr}
-                                onChange={e => setSelectedDateStr(e.target.value)}
-                                className="bg-transparent text-white text-2xl font-bold outline-none w-full text-center h-full"
-                            />
+                    {/* DateTime Section - Enhanced with ORA button */}
+                    <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col gap-2">
+                                <span className="text-xs font-black text-slate-500 tracking-[0.2em] text-center uppercase">GIORNO</span>
+                                <input
+                                    type="date"
+                                    value={selectedDateStr}
+                                    onChange={e => setSelectedDateStr(e.target.value)}
+                                    className="bg-transparent text-white text-3xl font-black outline-none w-full text-center"
+                                />
+                            </div>
+                            <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col gap-2">
+                                <span className="text-xs font-black text-slate-500 tracking-[0.2em] text-center uppercase">ORA</span>
+                                <input
+                                    type="time"
+                                    value={selectedTimeStr}
+                                    onChange={e => setSelectedTimeStr(e.target.value)}
+                                    className="bg-transparent text-white text-3xl font-black outline-none w-full text-center"
+                                />
+                            </div>
                         </div>
-                        <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col gap-2">
-                            <input
-                                type="time"
-                                value={selectedTimeStr}
-                                onChange={e => setSelectedTimeStr(e.target.value)}
-                                className="bg-transparent text-white text-2xl font-bold outline-none w-full text-center h-full"
-                            />
-                        </div>
+                        <button
+                            onClick={setNow}
+                            className="bg-blue-600/20 text-blue-400 border border-blue-500/30 p-6 rounded-3xl font-black text-2xl flex items-center justify-center gap-3 active:scale-95 transition-all mb-8"
+                        >
+                            <RefreshCw size={28} />
+                            IMPOSTA ORA ATTUALE
+                        </button>
                     </div>
-                </div>
-            </div>
 
-            {/* Footer */}
-            <div className="p-6 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 absolute bottom-0 left-0 right-0 z-20">
-                <div className="max-w-xl mx-auto">
-                    <button
-                        onClick={handleSave}
-                        disabled={isLoading}
-                        className="w-full h-24 rounded-[2rem] bg-white text-black font-black text-3xl tracking-tight shadow-xl shadow-white/10 active:scale-[0.98] transition-all flex items-center justify-center gap-4 disabled:opacity-50"
-                    >
-                        {isLoading ? <Loader2 className="animate-spin w-10 h-10" /> : <Check size={40} strokeWidth={4} />}
-                        {isLoading ? 'SALVATAGGIO...' : 'CONFERMA'}
-                    </button>
+                    {/* Integrated Confirmation Button - Moving it inside the scroll flow to avoid overlay issues */}
+                    <div className="pb-20">
+                        <button
+                            onClick={handleSave}
+                            disabled={isLoading}
+                            className="w-full h-28 rounded-[2.5rem] bg-white text-black font-black text-4xl tracking-tight shadow-2xl shadow-white/10 active:scale-[0.98] transition-all flex items-center justify-center gap-4 disabled:opacity-50"
+                        >
+                            {isLoading ? <Loader2 className="animate-spin w-12 h-12" /> : <Check size={48} strokeWidth={4} />}
+                            {isLoading ? 'SALVATAGGIO...' : 'CONFERMA'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
