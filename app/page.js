@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { Trash2, TrendingUp, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity } from 'lucide-react';
@@ -33,6 +33,7 @@ export default function Home() {
   const [weightTime, setWeightTime] = useState(new Date().toTimeString().slice(0, 5));
   const [hungryAdvice, setHungryAdvice] = useState(null);
   const [loadingHungry, setLoadingHungry] = useState(false);
+  const dateInputRef = useRef(null);
 
   const handleSetCurrentView = (view) => {
     setCurrentView(view);
@@ -114,7 +115,10 @@ export default function Home() {
 
       if (editingMeal) {
         await updateMeal(editingMeal.id, mealData);
-        setMeals((prev) => prev.map(m => m.id === editingMeal.id ? { ...m, ...mealData } : m));
+        setMeals((prev) => {
+          const updated = prev.map(m => m.id === editingMeal.id ? { ...m, ...mealData } : m);
+          return [...updated].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        });
         setEditingMeal(null);
       } else {
         const mealToSave = {
@@ -122,7 +126,10 @@ export default function Home() {
           image_path: pendingMealData?.image_path || null,
         };
         const newMeal = await addMeal(mealToSave);
-        setMeals((prev) => [newMeal, ...prev]);
+        setMeals((prev) => {
+          const updated = [...prev, newMeal];
+          return updated.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        });
       }
 
       setPendingMealData(null);
@@ -232,107 +239,26 @@ export default function Home() {
   }
 
   if (currentView === 'add-meal') {
-
-    if (inputMode) {
-      return (
-        <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24 px-4 pt-8">
-          <button
-            onClick={() => setInputMode(null)}
-            className="flex items-center gap-2 text-primary font-bold mb-6"
-          >
-            <span className="material-symbols-outlined">arrow_back</span>
-            Indietro
-          </button>
-          <CameraInput
-            onMealIdentified={handleMealIdentified}
-            defaultDate={selectedDate}
-            initialMode={inputMode}
-          />
-        </div>
-      );
-    }
-
     return (
-      <div className="bg-background-light dark:bg-background-dark text-[#111811] dark:text-[#f0f4f0] min-h-screen flex flex-col antialiased font-sans">
-        <header className="sticky top-0 z-30 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-[#e2e8e2] dark:border-[#1e331e] px-4 pt-4 pb-2">
-          <div className="flex items-center justify-between mb-2">
-            <button
-              onClick={() => handleSetCurrentView('dashboard')}
-              className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-            >
-              <span className="material-symbols-outlined">chevron_left</span>
-            </button>
-            <h1 className="text-lg font-bold">Metodo Inserimento</h1>
-            <div className="w-10"></div>
-          </div>
-        </header>
-
-        <main className="flex-1 px-4 py-6 flex flex-col gap-6">
-          <div className="grid grid-cols-3 gap-3">
-            <button
-              onClick={() => setInputMode('camera')}
-              className="flex flex-col items-center justify-center aspect-square bg-white dark:bg-[#1a2e1a] border border-[#e2e8e2] dark:border-[#1e331e] rounded-2xl shadow-sm hover:shadow-md transition-all active:scale-95 group"
-            >
-              <div className="w-12 h-12 mb-2 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20">
-                <span className="material-symbols-outlined text-primary text-3xl">photo_camera</span>
-              </div>
-              <span className="text-[11px] font-bold uppercase tracking-tight text-[#618961]">Scatta Foto</span>
-            </button>
-
-            <button
-              onClick={() => setInputMode('text')}
-              className="flex flex-col items-center justify-center aspect-square bg-white dark:bg-[#1a2e1a] border border-[#e2e8e2] dark:border-[#1e331e] rounded-2xl shadow-sm hover:shadow-md transition-all active:scale-95 group"
-            >
-              <div className="w-12 h-12 mb-2 rounded-full bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20">
-                <span className="material-symbols-outlined text-blue-500 text-3xl">edit_note</span>
-              </div>
-              <span className="text-[11px] font-bold uppercase tracking-tight text-[#618961]">Descrivi</span>
-            </button>
-
-            <button
-              onClick={() => setInputMode('barcode')}
-              className="flex flex-col items-center justify-center aspect-square bg-white dark:bg-[#1a2e1a] border border-[#e2e8e2] dark:border-[#1e331e] rounded-2xl shadow-sm hover:shadow-md transition-all active:scale-95 group"
-            >
-              <div className="w-12 h-12 mb-2 rounded-full bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20">
-                <span className="material-symbols-outlined text-amber-500 text-3xl">barcode_scanner</span>
-              </div>
-              <span className="text-[11px] font-bold uppercase tracking-tight text-[#618961]">Scansiona</span>
-            </button>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] border-2 border-dashed border-[#d1d9d1] dark:border-[#2d4a2d] bg-[#f9faf9] dark:bg-[#152815] rounded-3xl p-8 text-center">
-            <div className="w-20 h-20 mb-4 rounded-full bg-[#e8eee8] dark:bg-[#1e331e] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[#618961] text-4xl">add_a_photo</span>
-            </div>
-            <h2 className="text-lg font-semibold text-[#618961]">Inizia l'inserimento</h2>
-            <p className="text-sm text-[#88a888] mt-2 max-w-[240px]">Seleziona una delle opzioni sopra per aggiungere il tuo pasto velocemente tramite AI o scansione.</p>
-          </div>
-        </main>
-
-        <nav className="sticky bottom-0 bg-white/90 dark:bg-[#102210]/90 backdrop-blur-lg border-t border-[#e2e8e2] dark:border-[#1e331e] pb-safe pt-3 px-8 flex justify-between items-center">
+      <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24 px-4 pt-8 animate-in fade-in duration-500">
+        <div className="flex items-center justify-between mb-10">
           <button
-            onClick={() => handleSetCurrentView('dashboard')}
-            className="flex flex-col items-center gap-1 text-[#618961]"
+            onClick={() => {
+              setCurrentView('dashboard');
+              setInputMode(null);
+            }}
+            className="flex items-center gap-4 text-primary font-black text-4xl active:scale-90 transition-transform bg-primary/10 px-8 py-4 rounded-[2rem]"
           >
-            <span className="material-symbols-outlined">dashboard</span>
-            <span className="text-[10px] font-medium">Home</span>
+            <span className="material-symbols-outlined text-6xl">arrow_back</span>
+            INDIETRO
           </button>
-          <button className="flex flex-col items-center gap-1 text-primary">
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
-            <span className="text-[10px] font-medium">Inserisci</span>
-          </button>
-          <button className="flex flex-col items-center gap-1 text-[#618961]">
-            <span className="material-symbols-outlined">restaurant_menu</span>
-            <span className="text-[10px] font-medium">Peso</span>
-          </button>
-          <button
-            onClick={() => router.push('/profile')}
-            className="flex flex-col items-center gap-1 text-[#618961]"
-          >
-            <span className="material-symbols-outlined">person</span>
-            <span className="text-[10px] font-medium">Profilo</span>
-          </button>
-        </nav>
+          <span className="text-3xl font-black text-primary/50 uppercase italic tracking-tighter">AGGIUNGI PASTO</span>
+        </div>
+        <CameraInput
+          onMealIdentified={handleMealIdentified}
+          defaultDate={selectedDate}
+          initialMode={inputMode}
+        />
       </div>
     );
   }
@@ -529,32 +455,47 @@ export default function Home() {
               }}
             ></div>
           </div>
-          <h1 className="text-[#111811] dark:text-white text-5xl font-black leading-tight tracking-tight flex-1 text-center italic">DIETA</h1>
+          <h1 className="text-[#111811] dark:text-white text-7xl font-black leading-tight tracking-tight flex-1 text-center italic">DIETA</h1>
           <div className="flex w-24 items-center justify-end relative">
             <input
+              ref={dateInputRef}
               type="date"
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-20"
+              className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
               value={selectedDate.toISOString().split('T')[0]}
               onChange={(e) => {
                 const newDate = new Date(e.target.value);
-                setSelectedDate(newDate);
-                // Clear coach advice when changing date to force refresh for that context
-                setCoachAdvice(null);
+                if (!isNaN(newDate.getTime())) {
+                  setSelectedDate(newDate);
+                  setCoachAdvice(null);
+                }
               }}
             />
-            <button className="flex cursor-pointer items-center justify-center rounded-2xl h-24 w-24 bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-90">
+            <button
+              onClick={() => dateInputRef.current?.showPicker()}
+              className="flex cursor-pointer items-center justify-center rounded-2xl h-24 w-24 bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-90 shadow-inner border-2 border-primary/20"
+            >
               <span className="material-symbols-outlined text-8xl">calendar_month</span>
             </button>
           </div>
         </div>
 
         {/* Selected Date Indicator */}
-        <div className="px-4 py-4 bg-primary/5 flex items-center justify-center gap-4 border-t border-primary/10">
-          <span className="material-symbols-outlined text-4xl text-primary">event</span>
-          <h2 className="text-3xl font-black uppercase tracking-widest text-primary italic">
-            {selectedDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}
-            {selectedDate.toDateString() === new Date().toDateString() && " (OGGI)"}
-          </h2>
+        <div className="px-4 py-6 bg-primary/5 flex items-center justify-between gap-4 border-t-2 border-primary/10">
+          <div className="flex items-center gap-4">
+            <span className="material-symbols-outlined text-5xl text-primary drop-shadow-sm">event</span>
+            <h2 className="text-4xl font-black uppercase tracking-tighter text-primary italic">
+              {selectedDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {selectedDate.toDateString() === new Date().toDateString() && " (OGGI)"}
+            </h2>
+          </div>
+          {selectedDate.toDateString() !== new Date().toDateString() && (
+            <button
+              onClick={() => setSelectedDate(new Date())}
+              className="bg-primary text-white px-6 py-2 rounded-2xl font-black text-xl uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+            >
+              OGGI
+            </button>
+          )}
         </div>
       </div>
 
@@ -580,7 +521,7 @@ export default function Home() {
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center translate-y-4">
-                <span className="text-9xl font-black text-[#111811] dark:text-white leading-none">{totalCalories.toLocaleString()}</span>
+                <span className="text-[12rem] font-black text-[#111811] dark:text-white leading-none">{totalCalories.toLocaleString()}</span>
                 <span className="text-4xl text-[#618961] font-black uppercase tracking-widest mt-4">KCAL</span>
                 <div className="my-6 h-1.5 w-28 bg-[#dbe6db]"></div>
                 <span className="text-2xl text-[#618961] font-black italic">Target: {targetCalories.toLocaleString()}</span>
@@ -627,27 +568,28 @@ export default function Home() {
         </div>
 
         {/* Action Buttons Section */}
-        <div className="flex flex-col gap-6 px-4 py-12">
+        {/* Action Buttons Section */}
+        <div className="flex flex-col gap-10 px-4 py-12">
           <button
             onClick={() => handleSetCurrentView('add-meal')}
-            className="flex items-center justify-center gap-6 w-full h-28 rounded-[2.5rem] bg-primary text-[#111811] font-black text-3xl shadow-2xl shadow-primary/30 active:scale-95 transition-transform"
+            className="flex items-center justify-center gap-6 w-full h-48 rounded-[2.5rem] bg-primary text-[#111811] font-black text-7xl shadow-2xl shadow-primary/30 active:scale-95 transition-transform"
           >
-            <span className="material-symbols-outlined text-6xl">add_circle</span>
+            <span className="material-symbols-outlined text-[7rem]">add_circle</span>
             <span>AGGIUNGI PASTO</span>
           </button>
 
           <button
             onClick={handleHoFame}
             disabled={loadingHungry}
-            className="flex items-center justify-center gap-6 w-full h-28 rounded-[2.5rem] bg-amber-400 text-[#111811] font-black text-3xl shadow-2xl shadow-amber-400/30 active:scale-95 transition-transform disabled:opacity-50"
+            className="flex items-center justify-center gap-6 w-full h-48 rounded-[2.5rem] bg-amber-400 text-[#111811] font-black text-7xl shadow-2xl shadow-amber-400/30 active:scale-95 transition-transform disabled:opacity-50 mt-4 border-b-8 border-amber-600/30"
           >
-            <span className="material-symbols-outlined text-6xl">{loadingHungry ? 'hourglass_empty' : 'fastfood'}</span>
+            <span className="material-symbols-outlined text-[7rem]">{loadingHungry ? 'hourglass_empty' : 'fastfood'}</span>
             <span>HO FAME!</span>
           </button>
 
-          <button onClick={() => handleSetCurrentView('weight')} className="flex items-center justify-center gap-6 w-full h-28 rounded-[2.5rem] bg-white dark:bg-white/5 border-2 border-[#dbe6db] dark:border-white/10 text-[#111811] dark:text-white font-black text-3xl active:scale-95 transition-transform">
-            <span className="material-symbols-outlined text-6xl">trending_up</span>
-            <span>GRAFICI E PESO</span>
+          <button onClick={() => handleSetCurrentView('weight')} className="flex items-center justify-center gap-6 w-full h-48 rounded-[2.5rem] bg-white dark:bg-white/5 border-4 border-[#dbe6db] dark:border-white/10 text-[#111811] dark:text-white font-black text-7xl active:scale-95 transition-transform">
+            <span className="material-symbols-outlined text-[7rem]">trending_up</span>
+            <span>IL MIO PESO</span>
           </button>
         </div>
 
@@ -777,25 +719,25 @@ export default function Home() {
       </main>
 
       {/* Navigation Bar (iOS Style) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-background-dark border-t-8 border-[#13ec13]/20 px-8 py-8 pb-14 flex justify-between items-center z-20 shadow-[0_-20px_60px_rgba(0,0,0,0.15)]">
-        <button onClick={() => handleSetCurrentView('dashboard')} className="flex flex-col items-center text-primary group">
-          <span className="material-symbols-outlined text-8xl transition-all group-active:scale-95" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
-          <span className="text-3xl font-black mt-2 uppercase tracking-tighter">HOME</span>
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-background-dark border-t-8 border-[#13ec13]/20 px-4 py-8 pb-14 flex justify-between items-center z-20 shadow-[0_-20px_60px_rgba(0,0,0,0.15)]">
+        <button onClick={() => handleSetCurrentView('dashboard')} className="flex flex-col items-center text-primary group text-center px-1">
+          <span className="material-symbols-outlined text-[6rem] transition-all group-active:scale-95" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
+          <span className="text-5xl font-black mt-2 uppercase tracking-tighter">HOME</span>
         </button>
-        <button onClick={() => handleSetCurrentView('weight')} className="flex flex-col items-center text-[#618961] group">
-          <span className="material-symbols-outlined text-8xl transition-all group-active:scale-95">restaurant_menu</span>
-          <span className="text-3xl font-black mt-2 uppercase tracking-tighter">PESO</span>
+        <button onClick={() => handleSetCurrentView('weight')} className="flex flex-col items-center text-[#618961] group text-center px-1">
+          <span className="material-symbols-outlined text-[6rem] transition-all group-active:scale-95">restaurant_menu</span>
+          <span className="text-5xl font-black mt-2 uppercase tracking-tighter">PESO</span>
         </button>
-        <button className="flex flex-col items-center text-[#618961] group">
-          <span className="material-symbols-outlined text-8xl transition-all group-active:scale-95">emoji_events</span>
-          <span className="text-3xl font-black mt-2 uppercase tracking-tighter">PREMI</span>
+        <button className="flex flex-col items-center text-[#618961] group text-center px-1">
+          <span className="material-symbols-outlined text-[6rem] transition-all group-active:scale-95">emoji_events</span>
+          <span className="text-5xl font-black mt-2 uppercase tracking-tighter">PREMI</span>
         </button>
         <button
           onClick={() => router.push('/profile')}
-          className="flex flex-col items-center text-[#618961] group"
+          className="flex flex-col items-center text-[#618961] group text-center px-1"
         >
-          <span className="material-symbols-outlined text-8xl transition-all group-active:scale-95">account_circle</span>
-          <span className="text-3xl font-black mt-2 uppercase tracking-tighter">PROFILO</span>
+          <span className="material-symbols-outlined text-[6rem] transition-all group-active:scale-95">account_circle</span>
+          <span className="text-5xl font-black mt-2 uppercase tracking-tighter">PROFILO</span>
         </button>
       </div>
     </div>

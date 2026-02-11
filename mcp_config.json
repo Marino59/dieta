@@ -1,0 +1,18 @@
+{
+    "mcpServers": {
+        "google-stitch": {
+            "command": "cmd.exe",
+            "args": [
+                "/c",
+                "npx",
+                "-y",
+                "@_davideast/stitch-mcp",
+                "proxy"
+            ],
+            "env": {
+                "STITCH_API_KEY": "AQ.Ab8RN6JpgjQSFLgI6dY4degLnGA6iIcqrH5TUwwhWSjGTrjprw",
+                "API_KEY": "AQ.Ab8RN6JpgjQSFLgI6dY4degLnGA6iIcqrH5TUwwhWSjGTrjprw"
+            }
+        }
+    }
+}

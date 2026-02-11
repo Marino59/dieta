@@ -162,45 +162,41 @@ export default function CameraInput({ onMealAdded, onMealIdentified, hideButtons
             />
 
             {/* Top Navigation Tabs */}
-            {/* DEBUG: Removed condition !pendingMeal && !isAnalyzing */}
-            <div className="grid grid-cols-3 w-full gap-4 mb-6">
+            <div className="grid grid-cols-3 w-full gap-6 mb-12">
                 <button
                     onClick={() => setActiveTab('camera')}
-                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition-all ${activeTab === 'camera' ? 'shadow-xl scale-105 z-10' : 'opacity-80 hover:opacity-100 scale-100'}`}
+                    className={`aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all ${activeTab === 'camera' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
                     style={{
-                        background: activeTab === 'camera' ? 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)' : 'rgba(30, 41, 59, 0.5)',
-                        border: activeTab === 'camera' ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                        color: activeTab === 'camera' ? 'white' : '#94a3b8'
+                        background: activeTab === 'camera' ? 'linear-gradient(135deg, #13ec13 0%, #0ea50e 100%)' : '',
+                        color: activeTab === 'camera' ? 'white' : '#618961'
                     }}
                 >
-                    <Camera size={32} strokeWidth={activeTab === 'camera' ? 2 : 1.5} />
-                    <span className="text-xs font-bold mt-2 tracking-wider uppercase">Foto</span>
+                    <span className="text-[5rem] drop-shadow-lg mb-2">📸</span>
+                    <span className="text-xl font-black tracking-tighter uppercase mt-2">Foto</span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab('text')}
-                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition-all ${activeTab === 'text' ? 'shadow-xl scale-105 z-10' : 'opacity-80 hover:opacity-100 scale-100'}`}
+                    className={`aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all ${activeTab === 'text' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
                     style={{
-                        background: activeTab === 'text' ? 'linear-gradient(135deg, #f97316 0%, #fbbf24 100%)' : 'rgba(30, 41, 59, 0.5)',
-                        border: activeTab === 'text' ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                        color: activeTab === 'text' ? 'white' : '#94a3b8'
+                        background: activeTab === 'text' ? 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)' : '',
+                        color: activeTab === 'text' ? 'white' : '#1e40af'
                     }}
                 >
-                    <Edit2 size={32} strokeWidth={activeTab === 'text' ? 2 : 1.5} />
-                    <span className="text-xs font-bold mt-2 tracking-wider uppercase">Testo</span>
+                    <span className="text-[5rem] drop-shadow-lg mb-2">✍️</span>
+                    <span className="text-xl font-black tracking-tighter uppercase mt-2">Testo</span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab('barcode')}
-                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition-all ${activeTab === 'barcode' ? 'shadow-xl scale-105 z-10' : 'opacity-80 hover:opacity-100 scale-100'}`}
+                    className={`aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all ${activeTab === 'barcode' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
                     style={{
-                        background: activeTab === 'barcode' ? 'linear-gradient(135deg, #10b981 0%, #34d399 100%)' : 'rgba(30, 41, 59, 0.5)',
-                        border: activeTab === 'barcode' ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                        color: activeTab === 'barcode' ? 'white' : '#94a3b8'
+                        background: activeTab === 'barcode' ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' : '',
+                        color: activeTab === 'barcode' ? 'white' : '#92400e'
                     }}
                 >
-                    <ScanBarcode size={32} strokeWidth={activeTab === 'barcode' ? 2 : 1.5} />
-                    <span className="text-xs font-bold mt-2 tracking-wider uppercase">Codice</span>
+                    <span className="text-[5rem] drop-shadow-lg mb-2">🤳</span>
+                    <span className="text-xl font-black tracking-tighter uppercase mt-2">Codice</span>
                 </button>
             </div>
 
@@ -208,67 +204,63 @@ export default function CameraInput({ onMealAdded, onMealIdentified, hideButtons
             {/* Analysis Loading State */}
             {
                 isAnalyzing && (
-                    <div className="w-full mb-8 h-32 glass-panel rounded-2xl flex flex-col items-center justify-center gap-4 animate-pulse border border-blue-500/30">
-                        <Loader2 className="w-12 h-12 text-blue-400 animate-spin" />
-                        <span className="text-xl font-bold text-white">Analisi con AI in corso...</span>
+                    <div className="w-full mb-12 h-48 bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl flex flex-col items-center justify-center gap-6 animate-pulse border-4 border-blue-500/30">
+                        <Loader2 className="w-20 h-20 text-blue-500 animate-spin" strokeWidth={3} />
+                        <span className="text-4xl font-black text-[#111811] dark:text-white italic">ANALISI AI...</span>
                     </div>
                 )
             }
 
             {/* Content Area */}
-
-            {/* DEBUG: Removed condition !pendingMeal && !isAnalyzing */}
-            <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
 
                 {/* CAMERA MODE */}
                 {activeTab === 'camera' && (
                     <div className="flex flex-col items-center">
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full aspect-video rounded-3xl flex flex-col items-center justify-center border-2 border-dashed border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all group"
+                            className="w-full aspect-[4/3] rounded-[3.5rem] flex flex-col items-center justify-center border-4 border-dashed border-green-500/30 bg-green-500/10 hover:bg-green-500/20 active:scale-95 transition-all group shadow-xl"
                         >
-                            <div className="p-6 rounded-full bg-blue-500 shadow-xl shadow-blue-500/40 mb-4 group-hover:scale-110 transition-transform duration-300">
-                                <Camera size={48} color="white" />
+                            <div className="p-10 rounded-full bg-gradient-to-br from-[#13ec13] to-[#0ea50e] shadow-2xl shadow-green-500/40 mb-8 group-hover:scale-110 transition-transform duration-500 border-4 border-white/40">
+                                <Camera size={80} color="white" strokeWidth={2.5} />
                             </div>
-                            <span className="text-xl font-bold text-blue-200">Scatta una Foto</span>
-                            <span className="text-sm text-blue-400 mt-2">o carica dalla galleria</span>
+                            <span className="text-4xl font-black text-[#0ea50e] italic">SCATTA ORA</span>
+                            <span className="text-xl text-[#618961] mt-4 font-bold uppercase tracking-widest opacity-60">CARICA DALLA GALLERIA</span>
                         </button>
                     </div>
                 )}
 
                 {/* TEXT MODE */}
                 {activeTab === 'text' && (
-                    <div className="flex flex-col w-full">
+                    <div className="flex flex-col w-full gap-8">
                         <textarea
                             autoFocus
                             placeholder="Cosa hai mangiato?&#10;Es: 2 uova strapazzate con pane tostato..."
-                            className="w-full h-48 bg-white dark:bg-slate-900 border-4 border-orange-500/50 rounded-3xl p-6 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors resize-none mb-4 shadow-inner"
-                            style={{ fontSize: '1.5rem', lineHeight: '1.5' }} // Large Text
+                            className="w-full h-80 bg-white dark:bg-slate-900 border-4 border-blue-500/30 rounded-[3rem] p-10 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors resize-none shadow-2xl text-4xl font-bold leading-relaxed"
                             value={textDescription}
                             onChange={(e) => setTextDescription(e.target.value)}
                         />
                         <button
                             onClick={handleTextSubmit}
                             disabled={!textDescription.trim()}
-                            className="w-full py-5 rounded-2xl font-black text-xl tracking-wide shadow-xl shadow-orange-500/20 active:scale-95 transition-all text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{ background: 'linear-gradient(135deg, #f97316 0%, #fbbf24 100%)' }}
+                            className="w-full h-28 rounded-[2.5rem] font-black text-4xl tracking-tighter shadow-2xl shadow-blue-500/30 active:scale-95 transition-all text-white disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 border-4 border-white/20 uppercase"
                         >
-                            ANALIZZA TESTO
+                            🚀 ANALIZZA PASTO
                         </button>
                     </div>
                 )}
 
                 {/* BARCODE MODE */}
                 {activeTab === 'barcode' && (
-                    <div className="rounded-3xl overflow-hidden border-2 border-emerald-500/30 bg-black relative aspect-square">
+                    <div className="rounded-[4rem] overflow-hidden border-8 border-amber-500/30 bg-black relative aspect-square shadow-2xl">
                         <BarcodeScanner
                             onDetected={handleBarcodeDetected}
                             onClose={() => setActiveTab('text')} // Fallback if they close it
                         />
-                        <div className="absolute inset-0 pointer-events-none border-[3px] border-emerald-500/50 rounded-3xl z-10"></div>
-                        <div className="absolute bottom-4 left-0 right-0 text-center z-20">
-                            <span className="bg-black/60 text-white px-4 py-2 rounded-full text-sm font-bold backdrop-blur-md">
-                                Inquadra il codice a barre
+                        <div className="absolute inset-0 pointer-events-none border-[12px] border-amber-500/50 rounded-[4rem] z-10"></div>
+                        <div className="absolute bottom-10 left-0 right-0 text-center z-20">
+                            <span className="bg-amber-500/90 text-white px-8 py-4 rounded-3xl text-2xl font-black backdrop-blur-md shadow-xl border-2 border-white/20 uppercase tracking-tighter">
+                                Inquadra il codice
                             </span>
                         </div>
                     </div>

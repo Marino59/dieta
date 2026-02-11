@@ -1,43 +1,38 @@
 'use client';
 
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Clock } from 'lucide-react';
 
 export default function NutritionCard({ meal, onEdit, onDelete }) {
     if (!meal) return null;
 
     return (
-        <div className="glass-panel rounded-2xl p-5 mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex justify-between items-start mb-3">
+        <div className="card-modern p-5 animate-fade-in hover:scale-[1.01] transition-transform">
+            <div className="flex justify-between items-start mb-4">
                 <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-white capitalize truncate" style={{ fontSize: '1.75rem', marginBottom: '8px' }}>{meal.name}</h3>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', marginTop: '8px' }}>
-                        {/* Ora */}
-                        <div style={{
-                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                            padding: '6px 14px',
-                            borderRadius: '10px',
-                            border: '1px solid rgba(59, 130, 246, 0.3)',
-                            marginRight: '12px'
-                        }}>
-                            <span style={{ fontSize: '1.1rem', color: '#93c5fd', fontWeight: 'bold' }}>
+                    <h3 className="font-black text-white capitalize truncate text-xl mb-2">
+                        {meal.name}
+                    </h3>
+                    <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-1.5 glass-panel px-3 py-1.5 rounded-xl">
+                            <Clock size={14} className="text-blue-400" />
+                            <span className="text-blue-300 font-semibold">
                                 {new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
-
-                        {/* Info e Data */}
-                        <div style={{ display: 'flex', alignItems: 'center', fontSize: '1.1rem', color: '#9ca3af' }}>
-                            {meal.quantity && (
-                                <span style={{ color: '#d1d5db', fontWeight: 600, marginRight: '10px' }}>{meal.quantity}g</span>
-                            )}
-                            {meal.quantity && <span style={{ width: '5px', height: '5px', backgroundColor: '#6b7280', borderRadius: '50%', marginRight: '10px' }}></span>}
-                            <span>{new Date(meal.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-')}</span>
-                        </div>
+                        {meal.quantity && (
+                            <span className="text-slate-400 font-medium">{meal.quantity}g</span>
+                        )}
                     </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
+
+                <div className="flex flex-col items-end gap-3">
                     <div className="text-right">
-                        <span className="font-bold gradient-text" style={{ fontSize: '2.5rem', lineHeight: 1 }}>{meal.calories}</span>
-                        <span className="text-gray-400 block uppercase tracking-wider font-bold" style={{ fontSize: '0.9rem' }}>Kcal</span>
+                        <div className="text-4xl font-black text-gradient-primary leading-none">
+                            {meal.calories}
+                        </div>
+                        <div className="text-xs text-slate-500 uppercase font-bold tracking-wider mt-1">
+                            Kcal
+                        </div>
                     </div>
                     <div className="flex gap-2">
                         <button
@@ -46,14 +41,17 @@ export default function NutritionCard({ meal, onEdit, onDelete }) {
                                 e.stopPropagation();
                                 onEdit(meal);
                             }}
-                            className="p-2 rounded-full bg-slate-800/50 text-gray-400 hover:text-white hover:bg-slate-700 transition"
+                            className="touch-target p-2.5 glass-panel rounded-xl interactive text-slate-400 hover:text-blue-400"
                         >
                             <Pencil size={18} />
                         </button>
                         <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); onDelete(meal); }}
-                            className="p-2 rounded-full bg-slate-800/50 text-gray-400 hover:text-red-400 hover:bg-slate-700 transition"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(meal);
+                            }}
+                            className="touch-target p-2.5 glass-panel rounded-xl interactive text-slate-400 hover:text-red-400"
                         >
                             <Trash2 size={18} />
                         </button>
@@ -61,28 +59,46 @@ export default function NutritionCard({ meal, onEdit, onDelete }) {
                 </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 mt-4">
-                <MacroItem label="Proteine" value={meal.protein} color="bg-blue-500" bgColor="rgba(30, 64, 175, 0.3)" iconColor="#60a5fa" />
-                <MacroItem label="Carbi" value={meal.carbs} color="bg-emerald-500" bgColor="rgba(6, 95, 70, 0.3)" iconColor="#34d399" />
-                <MacroItem label="Grassi" value={meal.fat} color="bg-amber-500" bgColor="rgba(146, 64, 14, 0.3)" iconColor="#fbbf24" />
+            <div className="grid grid-cols-3 gap-3">
+                <MacroItem
+                    label="Proteine"
+                    value={meal.protein}
+                    gradient="bg-gradient-primary"
+                />
+                <MacroItem
+                    label="Carbs"
+                    value={meal.carbs}
+                    gradient="bg-gradient-success"
+                />
+                <MacroItem
+                    label="Grassi"
+                    value={meal.fat}
+                    gradient="bg-gradient-warning"
+                />
             </div>
 
             {meal.analysis && (
-                <div className="mt-4 pt-4 border-t border-gray-700/50">
-                    <p className="text-base text-gray-300 italicLeading-relaxed">"{meal.analysis}"</p>
+                <div className="mt-4 pt-4 border-t border-white/5">
+                    <p className="text-sm text-slate-400 italic leading-relaxed">
+                        "{meal.analysis}"
+                    </p>
                 </div>
             )}
         </div>
     );
 }
 
-function MacroItem({ label, value, color, bgColor, iconColor }) {
+function MacroItem({ label, value, gradient }) {
     return (
-        <div className="rounded-2xl p-4 text-center border transition hover:scale-[1.02]" style={{ backgroundColor: bgColor, borderColor: `${iconColor}30` }}>
-            <div className="text-white mb-0.5 font-black" style={{ fontSize: '1.5rem', lineHeight: 1 }}>{value}g</div>
-            <div className="uppercase tracking-widest mb-3 font-bold" style={{ color: iconColor, fontSize: '0.85rem' }}>{label}</div>
-            <div className="h-2.5 w-full rounded-full overflow-hidden" style={{ backgroundColor: `${iconColor}20`, border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                <div className={`h-full ${color} w-full rounded-full opacity-90`}></div>
+        <div className="glass-panel p-3 rounded-2xl text-center interactive">
+            <div className={`text-2xl font-black mb-1 ${gradient.replace('bg-', 'text-')}`}>
+                {value}
+            </div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2">
+                {label}
+            </div>
+            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div className={`h-full ${gradient} w-full rounded-full`}></div>
             </div>
         </div>
     );

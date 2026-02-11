@@ -4,31 +4,25 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { getUserProfile, saveUserProfile } from '@/lib/firestore';
-import { ArrowLeft, Save, User, Activity, Target, Calculator } from 'lucide-react';
+import { calculateTargetsFromGoal } from '@/lib/ai';
 
 const ACTIVITY_LEVELS = [
-    { value: 1.2, label: 'Sedentario', desc: 'Poco o nessun esercizio' },
-    { value: 1.375, label: 'Leggero', desc: 'Esercizio 1-3 giorni/settimana' },
-    { value: 1.55, label: 'Moderato', desc: 'Esercizio 3-5 giorni/settimana' },
-    { value: 1.725, label: 'Attivo', desc: 'Esercizio 6-7 giorni/settimana' },
-    { value: 1.9, label: 'Molto Attivo', desc: 'Atleta / lavoro fisico intenso' },
-];
-
-const GOALS = [
-    { value: -500, label: 'Dimagrire', desc: '-500 kcal/giorno (-0.5kg/sett.)' },
-    { value: 0, label: 'Mantenere', desc: 'Peso stabile' },
-    { value: 300, label: 'Aumentare', desc: '+300 kcal/giorno (massa)' },
+    { value: 1.2, label: 'Sedentario', desc: 'Lavoro d\'ufficio' },
+    { value: 1.375, label: 'Leggero', desc: 'Allenamento 1-2 volte' },
+    { value: 1.55, label: 'Moderato', desc: 'Allenamento 3-5 volte' },
+    { value: 1.725, label: 'Attivo', desc: 'Allenamento 6-7 volte' },
+    { value: 1.9, label: 'Atleta', desc: 'Professionista' },
 ];
 
 export default function ProfilePage() {
     const authContext = useAuth();
     const router = useRouter();
-
     const user = authContext?.user;
     const authLoading = authContext?.loading ?? true;
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [calculatingAI, setCalculatingAI] = useState(false);
 
     // Profile data
     const [weight, setWeight] = useState('');
@@ -36,20 +30,21 @@ export default function ProfilePage() {
     const [age, setAge] = useState('');
     const [sex, setSex] = useState('male');
     const [activityLevel, setActivityLevel] = useState(1.55);
-    const [goal, setGoal] = useState(0);
+    const [goalDescription, setGoalDescription] = useState('');
 
-    // Auth protection
+    // Calculated targets
+    const [targetCalories, setTargetCalories] = useState(2000);
+    const [protein, setProtein] = useState(150);
+    const [carbs, setCarbs] = useState(200);
+    const [fat, setFat] = useState(60);
+    const [aiExplanation, setAiExplanation] = useState('');
+
     useEffect(() => {
-        if (!authLoading && !user) {
-            router.push('/login');
-        }
+        if (!authLoading && !user) router.push('/login');
     }, [user, authLoading, router]);
 
-    // Load profile
     useEffect(() => {
-        if (user) {
-            loadProfile();
-        }
+        if (user) loadProfile();
     }, [user]);
 
     const loadProfile = async () => {
@@ -61,12 +56,45 @@ export default function ProfilePage() {
                 setAge(profile.age || '');
                 setSex(profile.sex || 'male');
                 setActivityLevel(profile.activityLevel || 1.55);
-                setGoal(profile.goal || 0);
+                setGoalDescription(profile.goalDescription || '');
+                setTargetCalories(profile.targetCalories || 2000);
+                setProtein(profile.protein || 150);
+                setCarbs(profile.carbs || 200);
+                setFat(profile.fat || 60);
+                setAiExplanation(profile.aiExplanation || '');
             }
         } catch (error) {
             console.error('Error loading profile:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAICalculate = async () => {
+        if (!weight || !height || !age || !goalDescription) {
+            alert('Inserisci peso, altezza, età e una descrizione dell\'obiettivo!');
+            return;
+        }
+
+        setCalculatingAI(true);
+        try {
+            const results = await calculateTargetsFromGoal(goalDescription, {
+                weight: parseFloat(weight),
+                height: parseFloat(height),
+                age: parseInt(age),
+                sex,
+                activityLevel
+            });
+
+            setTargetCalories(results.targetCalories);
+            setProtein(results.protein);
+            setCarbs(results.carbs);
+            setFat(results.fat);
+            setAiExplanation(results.explanation);
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            setCalculatingAI(false);
         }
     };
 
@@ -79,9 +107,12 @@ export default function ProfilePage() {
                 age: parseInt(age),
                 sex,
                 activityLevel,
-                goal,
-                tdee: calculateTDEE(),
-                targetCalories: calculateTargetCalories(),
+                goalDescription,
+                targetCalories,
+                protein,
+                carbs,
+                fat,
+                aiExplanation
             });
             router.push('/');
         } catch (error) {
@@ -91,114 +122,70 @@ export default function ProfilePage() {
         }
     };
 
-    // Mifflin-St Jeor Formula
-    const calculateBMR = () => {
-        const w = parseFloat(weight);
-        const h = parseFloat(height);
-        const a = parseInt(age);
-
-        if (!w || !h || !a) return 0;
-
-        if (sex === 'male') {
-            return 10 * w + 6.25 * h - 5 * a + 5;
-        } else {
-            return 10 * w + 6.25 * h - 5 * a - 161;
-        }
-    };
-
-    const calculateTDEE = () => {
-        return Math.round(calculateBMR() * activityLevel);
-    };
-
-    const calculateTargetCalories = () => {
-        return calculateTDEE() + goal;
-    };
-
-    const calculateMacros = () => {
-        const target = calculateTargetCalories();
-        const w = parseFloat(weight) || 70;
-
-        // Protein: 2g per kg bodyweight
-        const protein = Math.round(w * 2);
-        // Fat: 25% of calories
-        const fat = Math.round((target * 0.25) / 9);
-        // Carbs: remaining calories
-        const carbs = Math.round((target - (protein * 4) - (fat * 9)) / 4);
-
-        return { protein, carbs, fat };
-    };
-
     if (authLoading || loading || !user) {
         return (
-            <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary"></div>
             </div>
         );
     }
 
-    const tdee = calculateTDEE();
-    const targetCalories = calculateTargetCalories();
-    const macros = calculateMacros();
-    const isValid = weight && height && age;
-
     return (
-        <div className="min-h-screen pb-8 px-4 pt-6">
+        <div className="bg-background-light dark:bg-background-dark min-h-screen text-[#111811] dark:text-white transition-colors duration-300 antialiased font-sans">
             {/* Header */}
-            <div className="flex items-center gap-4 mb-6">
-                <button
-                    onClick={() => router.push('/')}
-                    className="h-10 w-10 glass-panel rounded-full flex items-center justify-center text-gray-400 hover:text-white transition"
-                >
-                    <ArrowLeft size={20} />
+            <div className="sticky top-0 z-30 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md px-4 py-8 flex items-center justify-between border-b-4 border-[#dbe6db]/30 shadow-md">
+                <button onClick={() => router.push('/')} className="w-24 h-24 flex items-center justify-center rounded-2xl bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-90 shadow-sm">
+                    <span className="material-symbols-outlined text-7xl font-black">arrow_back</span>
                 </button>
-                <h1 className="text-2xl font-bold text-white">Il Mio Profilo</h1>
+                <h1 className="text-5xl font-black italic tracking-tight uppercase">PROFILO</h1>
+                <div className="w-24"></div>
             </div>
 
-            <div className="space-y-6">
-                {/* Personal Info Section */}
-                <section className="glass-panel p-5 rounded-2xl">
-                    <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                        <User size={20} className="text-blue-400" />
-                        Dati Personali
-                    </h2>
+            <main className="w-full p-4 space-y-12 pb-48">
+                {/* Personal Info */}
+                <section className="bg-white dark:bg-[#1a2e1a] rounded-[3rem] p-10 shadow-xl border-4 border-[#dbe6db] dark:border-white/10 space-y-10">
+                    <div className="flex items-center gap-4 mb-4 text-primary">
+                        <span className="material-symbols-outlined text-5xl">person</span>
+                        <h2 className="font-black text-3xl uppercase tracking-widest italic">Dati Fisici</h2>
+                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-sm text-gray-400 mb-1 block">Peso (kg)</label>
+                    <div className="grid grid-cols-2 gap-8">
+                        <div className="space-y-4">
+                            <label className="text-xl font-black text-[#618961] uppercase tracking-tighter block ml-2">Peso (kg)</label>
                             <input
                                 type="number"
                                 value={weight}
                                 onChange={(e) => setWeight(e.target.value)}
+                                className="w-full h-24 bg-[#f6f8f6] dark:bg-black/20 border-4 border-[#dbe6db] dark:border-white/10 rounded-3xl px-8 text-4xl font-black focus:border-primary outline-none transition-all"
                                 placeholder="70"
-                                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
                             />
                         </div>
-                        <div>
-                            <label className="text-sm text-gray-400 mb-1 block">Altezza (cm)</label>
+                        <div className="space-y-4">
+                            <label className="text-xl font-black text-[#618961] uppercase tracking-tighter block ml-2">Altezza (cm)</label>
                             <input
                                 type="number"
                                 value={height}
                                 onChange={(e) => setHeight(e.target.value)}
+                                className="w-full h-24 bg-[#f6f8f6] dark:bg-black/20 border-4 border-[#dbe6db] dark:border-white/10 rounded-3xl px-8 text-4xl font-black focus:border-primary outline-none transition-all"
                                 placeholder="175"
-                                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
                             />
                         </div>
-                        <div>
-                            <label className="text-sm text-gray-400 mb-1 block">Età</label>
+                        <div className="space-y-4">
+                            <label className="text-xl font-black text-[#618961] uppercase tracking-tighter block ml-2">Età</label>
                             <input
                                 type="number"
                                 value={age}
                                 onChange={(e) => setAge(e.target.value)}
+                                className="w-full h-24 bg-[#f6f8f6] dark:bg-black/20 border-4 border-[#dbe6db] dark:border-white/10 rounded-3xl px-8 text-4xl font-black focus:border-primary outline-none transition-all"
                                 placeholder="30"
-                                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
                             />
                         </div>
-                        <div>
-                            <label className="text-sm text-gray-400 mb-1 block">Sesso</label>
+                        <div className="space-y-4">
+                            <label className="text-xl font-black text-[#618961] uppercase tracking-tighter block ml-2">Sesso</label>
                             <select
                                 value={sex}
                                 onChange={(e) => setSex(e.target.value)}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
+                                className="w-full h-24 bg-[#f6f8f6] dark:bg-black/20 border-4 border-[#dbe6db] dark:border-white/10 rounded-3xl px-8 text-3xl font-black focus:border-primary outline-none appearance-none cursor-pointer"
                             >
                                 <option value="male">Uomo</option>
                                 <option value="female">Donna</option>
@@ -208,126 +195,116 @@ export default function ProfilePage() {
                 </section>
 
                 {/* Activity Level */}
-                <section className="glass-panel p-5 rounded-2xl">
-                    <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                        <Activity size={20} className="text-emerald-400" />
-                        Livello Attività
-                    </h2>
+                <section className="bg-white dark:bg-[#1a2e1a] rounded-[3rem] p-10 shadow-xl border-4 border-[#dbe6db] dark:border-white/10">
+                    <div className="flex items-center gap-4 mb-8 text-primary">
+                        <span className="material-symbols-outlined text-5xl">directions_run</span>
+                        <h2 className="font-black text-3xl uppercase tracking-widest italic">Livello Attività</h2>
+                    </div>
 
-                    <div className="space-y-2">
+                    <div className="flex gap-6 overflow-x-auto pb-6 hide-scrollbar">
                         {ACTIVITY_LEVELS.map((level) => {
                             const isSelected = activityLevel === level.value;
                             return (
                                 <button
                                     key={level.value}
                                     onClick={() => setActivityLevel(level.value)}
-                                    className="w-full text-left p-4 rounded-xl border-2 transition"
-                                    style={{
-                                        backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.4)' : 'rgba(30, 41, 59, 0.5)',
-                                        borderColor: isSelected ? '#34d399' : '#334155',
-                                        boxShadow: isSelected ? '0 10px 25px rgba(16, 185, 129, 0.3)' : 'none'
-                                    }}
+                                    className={`flex-shrink-0 px-10 py-10 rounded-[3rem] border-4 transition-all text-center min-w-[240px] ${isSelected
+                                        ? 'bg-primary text-black border-primary font-black shadow-2xl shadow-primary/40'
+                                        : 'bg-[#f6f8f6] dark:bg-black/20 text-[#618961] border-[#dbe6db] dark:border-white/10'
+                                        }`}
                                 >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <div style={{ color: isSelected ? '#6ee7b7' : '#ffffff', fontWeight: 600 }}>{level.label}</div>
-                                            <div className="text-sm text-gray-400">{level.desc}</div>
-                                        </div>
-                                        {isSelected && (
-                                            <div style={{ width: 28, height: 28, backgroundColor: '#10b981', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
-                                                </svg>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <div className="text-3xl font-black">{level.label}</div>
+                                    <div className={`text-xl mt-3 font-bold ${isSelected ? 'text-black/70' : 'text-[#88a888]'}`}>{level.desc}</div>
                                 </button>
                             );
                         })}
                     </div>
                 </section>
 
-                {/* Goal */}
-                <section className="glass-panel p-5 rounded-2xl">
-                    <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                        <Target size={20} className="text-amber-400" />
-                        Obiettivo
-                    </h2>
-
-                    <div className="grid grid-cols-3 gap-2">
-                        {GOALS.map((g) => {
-                            const isSelected = goal === g.value;
-                            return (
-                                <button
-                                    key={g.value}
-                                    onClick={() => setGoal(g.value)}
-                                    className="p-4 rounded-xl border-2 transition text-center"
-                                    style={{
-                                        backgroundColor: isSelected ? 'rgba(245, 158, 11, 0.4)' : 'rgba(30, 41, 59, 0.5)',
-                                        borderColor: isSelected ? '#fbbf24' : '#334155',
-                                        boxShadow: isSelected ? '0 10px 25px rgba(245, 158, 11, 0.3)' : 'none'
-                                    }}
-                                >
-                                    <div style={{ color: isSelected ? '#fcd34d' : '#ffffff', fontWeight: 600, fontSize: '0.875rem' }}>{g.label}</div>
-                                    {isSelected && (
-                                        <div style={{ color: '#fbbf24', fontSize: '0.75rem', marginTop: '0.25rem' }}>✓</div>
-                                    )}
-                                </button>
-                            );
-                        })}
+                {/* AI GOAL DESCRIPTION */}
+                <section className="bg-white dark:bg-[#1a2e1a] rounded-[3rem] p-10 shadow-xl border-4 border-[#dbe6db] dark:border-white/10 space-y-8">
+                    <div className="flex items-center gap-4 mb-2 text-primary">
+                        <span className="material-symbols-outlined text-5xl">auto_awesome</span>
+                        <h2 className="font-black text-3xl uppercase tracking-widest italic">Obiettivo AI</h2>
                     </div>
+
+                    <p className="text-xl font-bold text-[#618961]">Cosa vuoi ottenere? (es: "Perdere 5kg per l'estate")</p>
+
+                    <textarea
+                        value={goalDescription}
+                        onChange={(e) => setGoalDescription(e.target.value)}
+                        placeholder="Esempio: Vorrei calare di 5 chili..."
+                        className="w-full bg-[#f6f8f6] dark:bg-black/20 border-4 border-[#dbe6db] dark:border-white/10 rounded-[2.5rem] px-8 py-8 text-3xl font-bold focus:border-primary outline-none transition-all h-64 resize-none"
+                    />
+
+                    <button
+                        onClick={handleAICalculate}
+                        disabled={calculatingAI || !goalDescription}
+                        className="w-full h-24 bg-black dark:bg-white text-white dark:text-black rounded-[2rem] font-black text-2xl flex items-center justify-center gap-4 disabled:opacity-50 active:scale-95 transition-transform shadow-xl"
+                    >
+                        {calculatingAI ? (
+                            <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent"></div>
+                        ) : (
+                            <>
+                                <span className="material-symbols-outlined text-4xl">psychology</span>
+                                CALCOLA OBIETTIVI AI
+                            </>
+                        )}
+                    </button>
                 </section>
 
-                {/* Results */}
-                {isValid && (
-                    <section className="glass-panel p-5 rounded-2xl bg-gradient-to-br from-blue-500/10 to-purple-500/10">
-                        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                            <Calculator size={20} className="text-blue-400" />
-                            Il Tuo Fabbisogno
-                        </h2>
-
-                        <div className="text-center mb-4">
-                            <div className="text-5xl font-black text-white">{targetCalories}</div>
-                            <div className="text-gray-400">kcal / giorno</div>
+                {/* Results Card */}
+                <section className="bg-primary rounded-[4rem] p-12 shadow-2xl shadow-primary/30 text-black space-y-12">
+                    <div className="text-center">
+                        <p className="text-xl font-black uppercase tracking-[0.3em] opacity-80">TARGET GIORNALIERO</p>
+                        <div className="text-[10rem] font-black mt-2 leading-none flex items-center justify-center gap-2">
+                            {targetCalories}
+                            <span className="text-4xl font-black opacity-60">kcal</span>
                         </div>
+                    </div>
 
-                        <div className="flex justify-around text-center">
-                            <div>
-                                <div className="text-2xl font-bold text-blue-400">{macros.protein}g</div>
-                                <div className="text-xs text-gray-500">Proteine</div>
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-emerald-400">{macros.carbs}g</div>
-                                <div className="text-xs text-gray-500">Carboidrati</div>
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-amber-400">{macros.fat}g</div>
-                                <div className="text-xs text-gray-500">Grassi</div>
-                            </div>
+                    <div className="grid grid-cols-3 gap-6 bg-black/10 rounded-[3rem] p-8 border-2 border-black/5">
+                        <div className="text-center">
+                            <p className="text-xl font-bold opacity-60 italic">PROT</p>
+                            <p className="text-4xl font-black">{protein}g</p>
                         </div>
+                        <div className="text-center border-x-4 border-black/10 px-4">
+                            <p className="text-xl font-bold opacity-60 italic">CARB</p>
+                            <p className="text-4xl font-black">{carbs}g</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-xl font-bold opacity-60 italic">GRASSI</p>
+                            <p className="text-4xl font-black">{fat}g</p>
+                        </div>
+                    </div>
 
-                        <div className="mt-4 text-xs text-gray-500 text-center">
-                            TDEE base: {tdee} kcal • Obiettivo: {goal > 0 ? '+' : ''}{goal} kcal
+                    {aiExplanation && (
+                        <div className="bg-white/90 rounded-[3rem] p-10 text-2xl leading-relaxed italic border-4 border-primary/20 shadow-xl font-bold">
+                            <span className="font-black flex items-center gap-4 mb-4 not-italic opacity-80 text-primary">
+                                <span className="material-symbols-outlined text-5xl">psychology</span>
+                                CONSIGLIO DEL COACH:
+                            </span>
+                            "{aiExplanation}"
                         </div>
-                    </section>
-                )}
+                    )}
+                </section>
 
                 {/* Save Button */}
                 <button
                     onClick={handleSave}
-                    disabled={!isValid || saving}
-                    className="w-full h-14 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition active:scale-95"
+                    disabled={saving}
+                    className="w-full h-28 bg-[#111811] dark:bg-white text-white dark:text-black rounded-[2.5rem] font-black text-3xl shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-6"
                 >
                     {saving ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                        <div className="animate-spin rounded-full h-12 w-12 border-8 border-primary border-t-transparent"></div>
                     ) : (
                         <>
-                            <Save size={20} />
-                            Salva Profilo
+                            <span className="material-symbols-outlined text-6xl">check_circle</span>
+                            SALVA PROFILO
                         </>
                     )}
                 </button>
-            </div>
+            </main>
         </div>
     );
 }

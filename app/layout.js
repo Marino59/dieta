@@ -2,41 +2,31 @@ import "./globals.css";
 import { AuthContextProvider } from "@/lib/auth-context";
 
 export const metadata = {
-  title: "Dieta",
+  title: "Dashboard Dieta",
   description: "Monitora la tua nutrizione con l'AI",
-  manifest: "/manifest.json?v=2",
-  icons: {
-    icon: "/globe.svg",
-    apple: "/globe.svg",
-  },
 };
 
 export const viewport = {
-  themeColor: "#0f172a",
-  width: "device-width",
+  width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="it" className="light">
       <head>
-
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
       </head>
-      <body className="antialiased min-h-screen pb-20 safe-area-inset-bottom">
+      <body className="antialiased min-h-screen bg-background-light dark:bg-background-dark">
         <AuthContextProvider>
-          <main className="max-w-md mx-auto min-h-screen relative bg-slate-900 shadow-2xl overflow-hidden">
-            {/* Background Effects */}
-            <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-              <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-500/20 rounded-full blur-[100px]" />
-              <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-500/20 rounded-full blur-[100px]" />
-            </div>
-
-            <div className="relative z-10 h-full flex flex-col">
-              {children}
-            </div>
+          <main className="w-full min-h-screen relative overflow-x-hidden">
+            {children}
           </main>
         </AuthContextProvider>
       </body>
