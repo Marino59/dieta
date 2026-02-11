@@ -47,6 +47,18 @@ export default function ProfilePage() {
         if (user) loadProfile();
     }, [user]);
 
+    // Automatic AI Recalculation with Debounce
+    useEffect(() => {
+        // Don't auto-calculate if we're still loading the initial profile
+        if (loading || !weight || !height || !age || !goalDescription) return;
+
+        const timer = setTimeout(() => {
+            handleAICalculate();
+        }, 1500); // 1.5s delay after the last change
+
+        return () => clearTimeout(timer);
+    }, [weight, height, age, sex, activityLevel, goalDescription]);
+
     const loadProfile = async () => {
         try {
             const profile = await getUserProfile();
@@ -114,6 +126,10 @@ export default function ProfilePage() {
                 fat,
                 aiExplanation
             });
+
+            // Clear home coach advice cache to force a refresh with new targets
+            localStorage.removeItem('coachAdviceCache');
+
             router.push('/');
         } catch (error) {
             alert('Errore nel salvataggio: ' + error.message);
