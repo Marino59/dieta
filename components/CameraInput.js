@@ -283,7 +283,7 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
                             <div className="p-10 rounded-full bg-gradient-to-br from-[#13ec13] to-[#0ea50e] shadow-2xl shadow-green-500/40 mb-8 group-hover:scale-110 transition-transform duration-500 border-4 border-white/40">
                                 <Camera size={80} color="white" strokeWidth={2.5} />
                             </div>
-                            <span className="text-4xl font-black text-[#0ea50e] italic">SCATTA ORA</span>
+                            <span className="text-4xl font-black text-[#111811] italic">SCATTA ORA</span>
                             <span className="text-xl text-[#618961] mt-4 font-bold uppercase tracking-widest opacity-60">CARICA DALLA GALLERIA</span>
                         </button>
                     </div>

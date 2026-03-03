@@ -271,7 +271,7 @@ export default function Home() {
               setCurrentView('dashboard');
               setInputMode(null);
             }}
-            className="flex items-center gap-4 text-primary font-black text-4xl active:scale-90 transition-transform bg-primary/10 px-8 py-4 rounded-[2rem]"
+            className="flex items-center gap-4 text-[#111811] font-black text-4xl active:scale-90 transition-transform bg-primary/10 px-8 py-4 rounded-[2rem]"
           >
             <span className="material-symbols-outlined text-4xl">arrow_back</span>
             INDIETRO
@@ -678,7 +678,7 @@ export default function Home() {
                   <div className="pt-6">
                     <button
                       onClick={() => setShowRecipe(!showRecipe)}
-                      className="flex items-center justify-center gap-4 w-full h-24 text-3xl font-black uppercase tracking-tighter text-primary bg-primary/20 rounded-[2.5rem] hover:bg-primary/30 transition-all active:scale-95"
+                      className="flex items-center justify-center gap-4 w-full h-24 text-3xl font-black uppercase tracking-tighter text-[#111811] bg-primary/20 rounded-[2.5rem] hover:bg-primary/30 transition-all active:scale-95"
                     >
                       <span className="material-symbols-outlined text-5xl">{showRecipe ? 'expand_less' : 'restaurant'}</span>
                       {showRecipe ? 'NASCONDI RICETTA' : 'RICETTA SUGGERITA'}
