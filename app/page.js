@@ -381,7 +381,7 @@ export default function Home() {
                 <h2 className="text-4xl font-black italic text-[#111811] dark:text-white uppercase tracking-tighter">Andamento</h2>
               </div>
               <div className="h-80 w-full relative mt-8">
-                <svg className="w-full h-full overflow-visible">
+                <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
                   {(() => {
                     const minWeight = Math.min(...weights.map(w => w.weight)) - 2;
                     const maxWeight = Math.max(...weights.map(w => w.weight)) + 2;
@@ -418,10 +418,10 @@ export default function Home() {
                           return (
                             <circle
                               key={w.id}
-                              cx={`${x}%`}
-                              cy={`${y}%`}
-                              r="12"
-                              className="fill-white stroke-primary stroke-[6px] shadow-sm"
+                              cx={x}
+                              cy={y}
+                              r="3"
+                              className="fill-white stroke-primary stroke-[1px] shadow-sm"
                             />
                           );
                         })}
