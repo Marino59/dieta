@@ -34,7 +34,7 @@ export default function BottomNav() {
     ];
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-background-dark/90 backdrop-blur-lg border-t border-border-light/30 dark:border-white/10 px-6 py-3 pb-8 flex justify-between items-center z-20 max-w-md mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-background-dark/90 backdrop-blur-lg border-t border-border-light/30 dark:border-white/10 px-6 py-3 pb-8 flex justify-between items-center z-20 max-w-4xl mx-auto">
             {navItems.map((item) => (
                 <button
                     key={item.path}

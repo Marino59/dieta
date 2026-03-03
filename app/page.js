@@ -463,7 +463,7 @@ export default function Home() {
           <div className="w-12" />
         </header>
 
-        <main className="flex-1 px-4 space-y-10 max-w-md mx-auto w-full py-4">
+        <main className="flex-1 px-4 space-y-10 max-w-4xl mx-auto w-full py-4">
           {/* Current Weight Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -498,7 +498,7 @@ export default function Home() {
           {/* Add Weight Modal/Overlay */}
           {isAddingWeight && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050a05]/95 backdrop-blur-xl">
-              <div className="w-full max-w-lg bg-[#0a150a] border-4 border-primary/20 rounded-[4rem] p-12 shadow-4xl">
+              <div className="w-full max-w-3xl bg-[#0a150a] border-4 border-primary/20 rounded-[4rem] p-12 shadow-4xl">
                 <div className="flex items-center justify-between mb-12">
                   <h2 className="text-4xl font-black italic uppercase tracking-tighter text-white">Nuova Pesata</h2>
                   <button onClick={() => setIsAddingWeight(false)} className="size-16 rounded-full bg-white/5 flex items-center justify-center">

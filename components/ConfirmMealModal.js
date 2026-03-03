@@ -102,7 +102,7 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                <div className="flex flex-col gap-12 max-w-xl mx-auto">
+                <div className="flex flex-col gap-12 max-w-4xl mx-auto">
 
                     {/* Main Title & Quantity */}
                     {/* Main Title & Quantity */}

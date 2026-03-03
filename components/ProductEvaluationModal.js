@@ -34,7 +34,7 @@ export default function ProductEvaluationModal({ productData, onClose }) {
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                <div className="flex flex-col gap-12 max-w-xl mx-auto mt-12">
+                <div className="flex flex-col gap-12 max-w-4xl mx-auto mt-12">
                     <div className="text-center space-y-8">
                         <span className="material-symbols-outlined text-[8rem] text-amber-500 mb-4 block drop-shadow-2xl">qr_code_scanner</span>
                         <h2 className="text-5xl font-black text-white uppercase tracking-tighter leading-tight bg-slate-800 p-8 rounded-[3rem] border-4 border-slate-700 shadow-xl">{productData.name}</h2>
