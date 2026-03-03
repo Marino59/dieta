@@ -81,7 +81,8 @@ export default function Home() {
     if (!user || !profile?.goalDescription || loading) return;
 
     const today = new Date().toISOString().split('T')[0];
-    const cacheKey = `coachAdvice_${user.uid}_${today}_m${meals.length}_w${weights.length}`;
+    const totalCals = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+    const cacheKey = `coachAdvice_${user.uid}_${today}_m${meals.length}_c${totalCals}_w${weights.length}`;
     const cached = localStorage.getItem('coachAdviceCache');
 
     if (cached) {
@@ -94,9 +95,8 @@ export default function Home() {
     }
 
     setLoadingCoach(true);
-    const totalCals = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
 
-    getDailyCoachAdvice(profile, totalCals, weights)
+    getDailyCoachAdvice(profile, meals, weights)
       .then(advice => {
         if (advice) {
           setCoachAdvice(advice);
@@ -106,7 +106,7 @@ export default function Home() {
       .catch(err => console.error("Coach fetch error:", err))
       .finally(() => setLoadingCoach(false));
 
-  }, [user, profile, meals.length, weights.length, loading]);
+  }, [user, profile, meals.length, weights.length, loading, meals.reduce((s, m) => s + (m.calories || 0), 0)]);
 
   const handleSaveNewMeal = async (confirmedData) => {
     try {
