@@ -694,10 +694,10 @@ export default function Home() {
 
                     {showRecipe && (
                       <div className="mt-12 bg-white/70 dark:bg-black/50 rounded-[3.5rem] p-12 border-4 border-[#13ec13]/30 animate-in fade-in slide-in-from-top-6 duration-700 shadow-2xl">
-                        <h4 className="font-black text-5xl mb-6 capitalize text-primary font-black italic">{coachAdvice.recipe.name}</h4>
+                        <h4 className="font-black text-5xl mb-6 capitalize text-[#111811] italic">{coachAdvice.recipe.name}</h4>
                         <p className="text-3xl text-[#111811] dark:text-white mb-10 leading-relaxed font-bold">{coachAdvice.recipe.content}</p>
-                        <div className="flex items-start gap-6 text-2xl font-black text-primary bg-primary/10 p-10 rounded-[3rem] italic border-2 border-primary/20">
-                          <span className="material-symbols-outlined text-5xl shrink-0">lightbulb</span>
+                        <div className="flex items-start gap-6 text-2xl font-black text-[#111811] bg-primary/10 p-10 rounded-[3rem] italic border-2 border-primary/20">
+                          <span className="material-symbols-outlined text-5xl shrink-0 text-primary">lightbulb</span>
                           <span>{coachAdvice.recipe.why}</span>
                         </div>
                       </div>
