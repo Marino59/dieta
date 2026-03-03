@@ -52,6 +52,7 @@ export default function Home() {
   const [hungryAdvice, setHungryAdvice] = useState(null);
   const [loadingHungry, setLoadingHungry] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [chartReady, setChartReady] = useState(false);
   const dateInputRef = useRef(null);
 
   const handleSetCurrentView = (view) => {
@@ -60,11 +61,20 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsMounted(true);
-    }, 300);
-    return () => clearTimeout(timer);
+    setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (currentView === 'weight') {
+      const timer = setTimeout(() => setChartReady(true), 600);
+      return () => {
+        clearTimeout(timer);
+        setChartReady(false);
+      };
+    } else {
+      setChartReady(false);
+    }
+  }, [currentView]);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
@@ -495,7 +505,7 @@ export default function Home() {
               </div>
 
               <div className="flex-1 w-full min-h-0 mt-8 relative">
-                {isMounted && (
+                {chartReady && (
                   <ResponsiveContainer width="100%" aspect={1.5} minWidth={0} minHeight={0}>
                     <BarChart data={chartData} margin={{ top: 40, right: 0, left: -30, bottom: 0 }}>
                       <XAxis
