@@ -60,7 +60,10 @@ export default function Home() {
   };
 
   useEffect(() => {
-    setIsMounted(true);
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 300);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -493,7 +496,7 @@ export default function Home() {
 
               <div className="flex-1 w-full min-h-0 mt-8 relative">
                 {isMounted && (
-                  <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0}>
+                  <ResponsiveContainer width="100%" aspect={1.5} minWidth={0} minHeight={0}>
                     <BarChart data={chartData} margin={{ top: 40, right: 0, left: -30, bottom: 0 }}>
                       <XAxis
                         dataKey="day"
