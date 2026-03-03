@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { Trash2, TrendingUp, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity, Loader2, AlertTriangle, User } from 'lucide-react';
 import { getMeals, deleteMeal, updateMeal, addMeal, getUserProfile, getWeights, addWeight, deleteWeight, subscribeToMeals } from '@/lib/firestore';
-import { getDailyCoachAdvice, getHungryAdvice } from "@/lib/ai";
+import { getDailyCoachAdvice, getHungryAdvice, parseWeightGoal } from "@/lib/ai";
 import ConfirmMealModal from '@/components/ConfirmMealModal';
 import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
@@ -17,7 +17,9 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  Cell
+  Cell,
+  Scatter,
+  ZAxis
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
@@ -55,6 +57,7 @@ export default function Home() {
   const [chartReady, setChartReady] = useState(false);
   const [chartWidth, setChartWidth] = useState(0);
   const [weightPeriod, setWeightPeriod] = useState('SETT');
+  const [parsedGoal, setParsedGoal] = useState(null);
   const chartContainerRef = useRef(null);
   const dateInputRef = useRef(null);
 
@@ -161,6 +164,35 @@ export default function Home() {
       .finally(() => setLoadingCoach(false));
 
   }, [user, profile, meals.length, weights.length, loading, meals.reduce((s, m) => s + (m.calories || 0), 0)]);
+
+  // Effect to parse weight goal from AI description
+  useEffect(() => {
+    if (!profile?.goalDescription) {
+      setParsedGoal(null);
+      return;
+    }
+
+    const parseGoal = async () => {
+      const cacheKey = `parsedGoal_${profile.goalDescription}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        setParsedGoal(JSON.parse(cached));
+        return;
+      }
+
+      try {
+        const result = await parseWeightGoal(profile.goalDescription);
+        if (result && result.targetWeight && result.targetDays) {
+          localStorage.setItem(cacheKey, JSON.stringify(result));
+          setParsedGoal(result);
+        }
+      } catch (err) {
+        console.error("Failed to parse AI goal", err);
+      }
+    };
+
+    parseGoal();
+  }, [profile?.goalDescription]);
 
   const handleSaveNewMeal = async (confirmedData) => {
     try {
@@ -289,21 +321,51 @@ export default function Home() {
 
   // Prepare Chart Data (Dynamic Period)
   const chartData = (() => {
+    const result = [];
+    const now = new Date();
+
+    // Helper for linear target calculation
+    const getLinearTarget = (date) => {
+      if (!parsedGoal || !parsedGoal.targetWeight || !parsedGoal.targetDays || sortedWeights.length < 1) return null;
+
+      // Use the earliest available weight as start weight
+      const startWeightEntry = sortedWeights[0];
+      const startWeight = startWeightEntry.weight;
+      const startDate = new Date(startWeightEntry.created_at);
+
+      const daysPassed = Math.max(0, (date - startDate) / (1000 * 60 * 60 * 24));
+
+      // Slope: (targetWeight - startWeight) / totalDays
+      const dailyChange = (parsedGoal.targetWeight - startWeight) / parsedGoal.targetDays;
+
+      // Linear regression
+      const calculatedTarget = startWeight + (dailyChange * daysPassed);
+
+      // Final goal shouldn't go below targetWeight (or above if gaining)
+      const isLosing = parsedGoal.targetWeight < startWeight;
+      if (isLosing) {
+        return Math.max(parsedGoal.targetWeight, calculatedTarget);
+      } else {
+        return Math.min(parsedGoal.targetWeight, calculatedTarget);
+      }
+    };
+
     if (weightPeriod === 'SETT') {
       const days = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB'];
-      const result = [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const dayLabel = days[d.getDay()];
         const dayWeights = weights.filter(w => new Date(w.created_at).toDateString() === d.toDateString());
         const weight = dayWeights.length > 0 ? dayWeights[dayWeights.length - 1].weight : 0;
-        result.push({ day: dayLabel, weight });
+        result.push({
+          day: dayLabel,
+          weight,
+          target: getLinearTarget(d),
+          isCurrent: i === 0
+        });
       }
-      return result;
     } else if (weightPeriod === 'MESE') {
-      const result = [];
-      const now = new Date();
       // Group last 28 days into 4 weeks
       for (let i = 3; i >= 0; i--) {
         const start = new Date(now);
@@ -320,32 +382,37 @@ export default function Home() {
           ? weekWeights.reduce((sum, w) => sum + w.weight, 0) / weekWeights.length
           : 0;
 
-        result.push({ day: `S${4 - i}`, weight: parseFloat(avg.toFixed(1)) });
+        result.push({
+          day: i === 0 ? 'ORA' : `-${i} SETT`,
+          weight: Number(avg.toFixed(1)),
+          target: getLinearTarget(end),
+          isCurrent: i === 0
+        });
       }
-      return result;
     } else if (weightPeriod === 'ANNO') {
-      const result = [];
       const monthNames = ['GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU', 'LUGL', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'];
-      const now = new Date();
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const targetMonth = d.getMonth();
-        const targetYear = d.getFullYear();
+        const monthStr = monthNames[d.getMonth()];
 
-        const monthWeights = weights.filter(w => {
-          const date = new Date(w.created_at);
-          return date.getMonth() === targetMonth && date.getFullYear() === targetYear;
+        const weightsInMonth = weights.filter(w => {
+          const wd = new Date(w.created_at);
+          return wd.getMonth() === d.getMonth() && wd.getFullYear() === d.getFullYear();
         });
 
-        const avg = monthWeights.length > 0
-          ? monthWeights.reduce((sum, w) => sum + w.weight, 0) / monthWeights.length
+        const avg = weightsInMonth.length > 0
+          ? weightsInMonth.reduce((sum, w) => sum + w.weight, 0) / weightsInMonth.length
           : 0;
 
-        result.push({ day: monthNames[targetMonth], weight: parseFloat(avg.toFixed(1)) });
+        result.push({
+          day: monthStr,
+          weight: Number(avg.toFixed(1)),
+          target: getLinearTarget(new Date(d.getFullYear(), d.getMonth() + 1, 0)),
+          isCurrent: i === 0
+        });
       }
-      return result;
     }
-    return [];
+    return result;
   })();
 
   const handleHoFame = async () => {
@@ -591,16 +658,18 @@ export default function Home() {
                         {chartData.map((entry, index) => (
                           <Cell
                             key={`cell-${index}`}
-                            fill={entry.weight > 0 ? (index === chartData.length - 1 ? '#22c55e' : 'rgba(34,197,94,0.3)') : 'transparent'}
+                            fill={entry.weight > 0 ? (entry.isCurrent ? '#22c55e' : 'rgba(34,197,94,0.4)') : 'transparent'}
                           />
                         ))}
                       </Bar>
+                      <Scatter dataKey="target" fill="#ef4444" shape="circle" line={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
                 {currentWeight > 0 && (
-                  <div className="absolute right-6 top-[30%] text-white text-4xl font-black italic drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+                  <div className="absolute right-6 top-[30%] text-white text-4xl font-black italic drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center gap-2">
                     {currentWeight}
+                    <span className="text-xl not-italic opacity-40">kg</span>
                   </div>
                 )}
               </div>
