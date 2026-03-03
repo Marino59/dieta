@@ -54,6 +54,7 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [chartReady, setChartReady] = useState(false);
   const [chartWidth, setChartWidth] = useState(0);
+  const [weightPeriod, setWeightPeriod] = useState('SETT');
   const chartContainerRef = useRef(null);
   const dateInputRef = useRef(null);
 
@@ -286,19 +287,65 @@ export default function Home() {
 
   const weeklyDelta = getWeeklyDelta();
 
-  // Prepare Chart Data (Last 7 Days)
+  // Prepare Chart Data (Dynamic Period)
   const chartData = (() => {
-    const days = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB'];
-    const result = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dayLabel = days[d.getDay()];
-      const dayWeights = weights.filter(w => new Date(w.created_at).toDateString() === d.toDateString());
-      const weight = dayWeights.length > 0 ? dayWeights[dayWeights.length - 1].weight : 0;
-      result.push({ day: dayLabel, weight });
+    if (weightPeriod === 'SETT') {
+      const days = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB'];
+      const result = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dayLabel = days[d.getDay()];
+        const dayWeights = weights.filter(w => new Date(w.created_at).toDateString() === d.toDateString());
+        const weight = dayWeights.length > 0 ? dayWeights[dayWeights.length - 1].weight : 0;
+        result.push({ day: dayLabel, weight });
+      }
+      return result;
+    } else if (weightPeriod === 'MESE') {
+      const result = [];
+      const now = new Date();
+      // Group last 28 days into 4 weeks
+      for (let i = 3; i >= 0; i--) {
+        const start = new Date(now);
+        start.setDate(now.getDate() - (i + 1) * 7);
+        const end = new Date(now);
+        end.setDate(now.getDate() - i * 7);
+
+        const weekWeights = weights.filter(w => {
+          const date = new Date(w.created_at);
+          return date >= start && date < end;
+        });
+
+        const avg = weekWeights.length > 0
+          ? weekWeights.reduce((sum, w) => sum + w.weight, 0) / weekWeights.length
+          : 0;
+
+        result.push({ day: `S${4 - i}`, weight: parseFloat(avg.toFixed(1)) });
+      }
+      return result;
+    } else if (weightPeriod === 'ANNO') {
+      const result = [];
+      const monthNames = ['GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU', 'LUGL', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'];
+      const now = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const targetMonth = d.getMonth();
+        const targetYear = d.getFullYear();
+
+        const monthWeights = weights.filter(w => {
+          const date = new Date(w.created_at);
+          return date.getMonth() === targetMonth && date.getFullYear() === targetYear;
+        });
+
+        const avg = monthWeights.length > 0
+          ? monthWeights.reduce((sum, w) => sum + w.weight, 0) / monthWeights.length
+          : 0;
+
+        result.push({ day: monthNames[targetMonth], weight: parseFloat(avg.toFixed(1)) });
+      }
+      return result;
     }
-    return result;
+    return [];
   })();
 
   const handleHoFame = async () => {
@@ -503,9 +550,10 @@ export default function Home() {
                 {['SETT', 'MESE', 'ANNO'].map((period) => (
                   <button
                     key={period}
+                    onClick={() => setWeightPeriod(period)}
                     className={cn(
                       "px-6 py-3 text-sm font-black rounded-xl transition-all uppercase tracking-tighter",
-                      period === 'SETT' ? "bg-[#22c55e] text-[#050a05]" : "text-white/40 hover:text-white/60"
+                      weightPeriod === period ? "bg-[#22c55e] text-[#050a05]" : "text-white/40 hover:text-white/60"
                     )}
                   >
                     {period}
