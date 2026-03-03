@@ -659,7 +659,7 @@ export default function Home() {
                 <span className="material-symbols-outlined text-6xl">auto_awesome</span>
               </div>
 
-              <div className="flex items-center gap-4 mb-8 text-primary">
+              <div className="flex items-center gap-4 mb-8 text-[#111811] dark:text-white/80">
                 <span className="material-symbols-outlined text-5xl">psychology</span>
                 <h3 className="font-black text-2xl uppercase tracking-[0.2em]">IL TUO AI COACH</h3>
               </div>
@@ -671,7 +671,7 @@ export default function Home() {
                 </div>
               ) : coachAdvice ? (
                 <div className="space-y-12">
-                  <p className="text-xl font-black leading-tight italic text-[#111811] dark:text-white">
+                  <p className="text-3xl font-black leading-tight italic text-[#111811] dark:text-white">
                     "{coachAdvice.tip}"
                   </p>
 
