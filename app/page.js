@@ -53,6 +53,8 @@ export default function Home() {
   const [loadingHungry, setLoadingHungry] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [chartReady, setChartReady] = useState(false);
+  const [chartWidth, setChartWidth] = useState(0);
+  const chartContainerRef = useRef(null);
   const dateInputRef = useRef(null);
 
   const handleSetCurrentView = (view) => {
@@ -65,8 +67,24 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const handleResize = () => {
+      if (currentView === 'weight' && chartContainerRef.current) {
+        setChartWidth(chartContainerRef.current.offsetWidth);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [currentView]);
+
+  useEffect(() => {
     if (currentView === 'weight') {
-      const timer = setTimeout(() => setChartReady(true), 600);
+      const timer = setTimeout(() => {
+        if (chartContainerRef.current) {
+          const width = chartContainerRef.current.offsetWidth;
+          setChartWidth(width || 300); // Fallback to 300 if measurement fails
+        }
+        setChartReady(true);
+      }, 800); // Increased delay
       return () => {
         clearTimeout(timer);
         setChartReady(false);
@@ -504,9 +522,9 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="flex-1 w-full min-h-0 mt-8 relative">
-                {chartReady && (
-                  <ResponsiveContainer width="100%" aspect={1.5} minWidth={0} minHeight={0}>
+              <div className="flex-1 w-full min-h-[300px] mt-8 relative" ref={chartContainerRef}>
+                {chartReady && chartWidth > 0 && (
+                  <ResponsiveContainer width={chartWidth} height="100%" minWidth={0} minHeight={0}>
                     <BarChart data={chartData} margin={{ top: 40, right: 0, left: -30, bottom: 0 }}>
                       <XAxis
                         dataKey="day"
