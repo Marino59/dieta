@@ -304,31 +304,31 @@ export default function Home() {
   if (currentView === 'weight') {
     return (
       <div className="bg-background-light dark:bg-background-dark min-h-screen text-[#111811] dark:text-white pb-32 flex flex-col antialiased font-sans">
-        <header className="sticky top-0 z-30 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-[#e2e8e2] dark:border-[#1e331e] px-4 py-8">
+        <header className="sticky top-0 z-30 bg-white dark:bg-background-dark border-b-8 border-[#13ec13]/20 px-6 py-12">
           <div className="flex items-center justify-between">
             <button
               onClick={() => handleSetCurrentView('dashboard')}
-              className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary active:scale-90 transition-all"
+              className="flex items-center justify-center w-20 h-20 rounded-[2rem] bg-primary/10 text-primary active:scale-90 transition-all border-4 border-primary/20"
             >
-              <ChevronLeft size={24} />
+              <ChevronLeft size={48} strokeWidth={4} />
             </button>
-            <h1 className="text-2xl font-black italic tracking-tighter uppercase">Il Tuo Peso</h1>
-            <div className="w-12"></div>
+            <h1 className="text-5xl font-black italic tracking-tighter uppercase text-[#111811] dark:text-white">Il Tuo Peso</h1>
+            <div className="w-20"></div>
           </div>
         </header>
 
         <main className="flex-1 px-4 py-8 space-y-10">
           {/* Quick Add Section */}
-          <section className="bg-white dark:bg-background-dark rounded-[3rem] p-8 border-4 border-[#dbe6db] dark:border-white/10 shadow-xl">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="p-4 rounded-3xl bg-primary/20 text-primary">
-                <TrendingUp size={24} />
+          <section className="bg-white dark:bg-background-dark rounded-[4rem] p-12 border-8 border-[#dbe6db] dark:border-white/10 shadow-3xl">
+            <div className="flex items-center gap-6 mb-12">
+              <div className="p-6 rounded-[2rem] bg-primary/20 text-primary border-4 border-primary/20">
+                <TrendingUp size={48} strokeWidth={3} />
               </div>
-              <h2 className="text-xl font-black italic">NUOVA PESATA</h2>
+              <h2 className="text-4xl font-black italic text-[#111811] dark:text-white uppercase tracking-tighter">Nuova Pesata</h2>
             </div>
 
-            <div className="space-y-8">
-              <div className="relative">
+            <div className="space-y-12">
+              <div className="relative group">
                 <input
                   type="number"
                   inputMode="decimal"
@@ -336,28 +336,28 @@ export default function Home() {
                   value={newWeightValue}
                   onChange={(e) => setNewWeightValue(e.target.value)}
                   placeholder="00.0"
-                  className="w-full text-6xl font-black bg-transparent text-center border-b-4 border-primary/20 focus:border-primary outline-none py-2 dark:text-white transition-colors"
+                  className="w-full text-[10rem] font-black bg-transparent text-center border-b-8 border-primary/20 focus:border-primary outline-none py-4 dark:text-white transition-all placeholder:text-[#dbe6db]"
                 />
-                <span className="absolute bottom-4 right-4 text-2xl font-black text-[#618961]">KG</span>
+                <span className="absolute bottom-8 right-0 text-5xl font-black text-primary italic uppercase tracking-widest">KG</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-primary/5 p-4 rounded-3xl flex flex-col items-center gap-2 border border-primary/10">
-                  <Calendar className="text-primary" size={24} />
+              <div className="grid grid-cols-2 gap-8">
+                <div className="bg-primary/5 p-8 rounded-[2.5rem] flex flex-col items-center gap-4 border-4 border-primary/10 active:bg-primary/10 transition-colors">
+                  <Calendar className="text-primary" size={48} strokeWidth={3} />
                   <input
                     type="date"
                     value={weightDate}
                     onChange={(e) => setWeightDate(e.target.value)}
-                    className="bg-transparent text-lg font-bold outline-none text-center w-full"
+                    className="bg-transparent text-3xl font-black outline-none text-center w-full text-[#111811] dark:text-white"
                   />
                 </div>
-                <div className="bg-primary/5 p-4 rounded-3xl flex flex-col items-center gap-2 border border-primary/10">
-                  <Clock className="text-primary" size={24} />
+                <div className="bg-primary/5 p-8 rounded-[2.5rem] flex flex-col items-center gap-4 border-4 border-primary/10 active:bg-primary/10 transition-colors">
+                  <Clock className="text-primary" size={48} strokeWidth={3} />
                   <input
                     type="time"
                     value={weightTime}
                     onChange={(e) => setWeightTime(e.target.value)}
-                    className="bg-transparent text-lg font-bold outline-none text-center w-full"
+                    className="bg-transparent text-3xl font-black outline-none text-center w-full text-[#111811] dark:text-white"
                   />
                 </div>
               </div>
@@ -365,22 +365,22 @@ export default function Home() {
               <button
                 onClick={handleAddWeight}
                 disabled={!newWeightValue || loading}
-                className="w-full h-16 rounded-2xl bg-primary text-[#111811] font-black text-xl shadow-2xl shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-4 disabled:opacity-30"
+                className="w-full h-32 rounded-[2.5rem] bg-primary text-[#111811] font-black text-4xl shadow-[0_20px_50px_rgba(19,236,19,0.3)] active:scale-95 transition-all flex items-center justify-center gap-6 disabled:opacity-30 uppercase tracking-tighter"
               >
-                {loading ? <Activity className="animate-spin" /> : <Plus size={24} strokeWidth={4} />}
-                SALVA PESO
+                {loading ? <Activity className="animate-spin text-5xl" /> : <Plus size={48} strokeWidth={5} />}
+                Salva Peso
               </button>
             </div>
           </section>
 
-          {/* Simple Chart Visualization */}
+          {/* Bold Chart Visualization */}
           {weights.length > 1 && (
-            <section className="bg-white dark:bg-background-dark rounded-[3rem] p-8 border-4 border-[#dbe6db] dark:border-white/10 shadow-xl overflow-hidden">
-              <div className="flex items-center gap-4 mb-8">
-                <Activity className="text-primary" size={32} />
-                <h2 className="text-2xl font-black italic">ANDAMENTO</h2>
+            <section className="bg-white dark:bg-background-dark rounded-[4rem] p-12 border-8 border-[#dbe6db] dark:border-white/10 shadow-3xl overflow-hidden">
+              <div className="flex items-center gap-6 mb-12">
+                <Activity className="text-primary" size={56} strokeWidth={3} />
+                <h2 className="text-4xl font-black italic text-[#111811] dark:text-white uppercase tracking-tighter">Andamento</h2>
               </div>
-              <div className="h-48 w-full relative mt-4">
+              <div className="h-80 w-full relative mt-8">
                 <svg className="w-full h-full overflow-visible">
                   {(() => {
                     const minWeight = Math.min(...weights.map(w => w.weight)) - 2;
@@ -398,7 +398,16 @@ export default function Home() {
                           points={points}
                           fill="none"
                           stroke="currentColor"
-                          strokeWidth="4"
+                          strokeWidth="10"
+                          className="text-primary/30"
+                          vectorEffect="non-scaling-stroke"
+                          style={{ strokeLinejoin: 'round', strokeLinecap: 'round' }}
+                        />
+                        <polyline
+                          points={points}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="6"
                           className="text-primary"
                           vectorEffect="non-scaling-stroke"
                           style={{ strokeLinejoin: 'round', strokeLinecap: 'round' }}
@@ -411,8 +420,8 @@ export default function Home() {
                               key={w.id}
                               cx={`${x}%`}
                               cy={`${y}%`}
-                              r="6"
-                              className="fill-white stroke-primary stroke-[4px]"
+                              r="12"
+                              className="fill-white stroke-primary stroke-[6px] shadow-sm"
                             />
                           );
                         })}
@@ -421,36 +430,38 @@ export default function Home() {
                   })()}
                 </svg>
               </div>
-              <div className="flex justify-between mt-6 px-1 text-sm font-black text-[#618961]">
+              <div className="flex justify-between mt-10 px-2 text-2xl font-black text-[#111811] dark:text-white/60 uppercase tracking-widest">
                 <span>{new Date(weights[0].created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}</span>
                 <span>{new Date(weights[weights.length - 1].created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}</span>
               </div>
             </section>
           )}
 
-          {/* History List */}
-          <section className="space-y-6">
-            <h3 className="text-3xl font-black italic ml-4">STORICO</h3>
-            <div className="space-y-4">
+          {/* Bold History List */}
+          <section className="space-y-8 pb-12">
+            <h3 className="text-4xl font-black italic ml-6 text-[#111811] dark:text-white uppercase tracking-tighter">Storico</h3>
+            <div className="space-y-6">
               {weights.length === 0 ? (
-                <p className="text-center text-[#618961] py-12 text-2xl font-bold bg-white dark:bg-background-dark rounded-[2.5rem] border-4 border-[#dbe6db] dark:border-white/10">Nessun dato registrato.</p>
+                <p className="text-center text-[#618961] py-20 text-3xl font-black bg-white dark:bg-background-dark rounded-[3rem] border-8 border-[#dbe6db] dark:border-white/10">Nessun dato registrato.</p>
               ) : (
                 [...weights].reverse().map(w => (
-                  <div key={w.id} className="flex items-center gap-6 bg-white dark:bg-background-dark p-6 rounded-[2.5rem] border-4 border-[#dbe6db] dark:border-white/20 shadow-lg">
-                    <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                      <TrendingUp size={32} />
+                  <div key={w.id} className="flex items-center gap-8 bg-white dark:bg-background-dark p-8 rounded-[3.5rem] border-8 border-[#dbe6db] dark:border-white/20 shadow-xl">
+                    <div className="size-20 rounded-[1.5rem] bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/20 shrink-0">
+                      <TrendingUp size={48} strokeWidth={3} />
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-2xl font-black text-[#111811] dark:text-white tracking-tighter">{w.weight}<span className="text-base ml-1 text-[#618961]">kg</span></h4>
-                      <p className="text-sm text-[#618961] font-bold mt-1">
-                        {new Date(w.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit' })} • {new Date(w.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <h4 className="text-5xl font-black text-[#111811] dark:text-white tracking-tighter italic">
+                        {w.weight}<span className="text-2xl ml-2 text-primary font-black uppercase not-italic">kg</span>
+                      </h4>
+                      <p className="text-xl text-[#618961] font-bold mt-2 uppercase tracking-wide">
+                        {new Date(w.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'long' })} • {new Date(w.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
                     <button
                       onClick={() => handleDeleteWeight(w.id)}
-                      className="size-16 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center active:scale-90 transition-all"
+                      className="size-20 rounded-[1.5rem] bg-red-500/10 text-red-500 flex items-center justify-center active:scale-90 transition-all border-4 border-red-500/10"
                     >
-                      <Trash2 size={28} />
+                      <Trash2 size={40} strokeWidth={3} />
                     </button>
                   </div>
                 ))
@@ -459,22 +470,22 @@ export default function Home() {
           </section>
         </main>
 
-        <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-background-dark border-t-8 border-[#13ec13]/20 px-8 py-8 pb-14 flex justify-between items-center z-20 shadow-[0_-20px_60px_rgba(0,0,0,0.15)]">
-          <button onClick={() => handleSetCurrentView('dashboard')} className="flex flex-col items-center text-[#618961] group">
-            <span className="material-symbols-outlined text-8xl transition-all group-active:scale-95">home</span>
-            <span className="text-3xl font-black mt-2 uppercase tracking-tighter">HOME</span>
+        <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-background-dark border-t-8 border-[#13ec13]/20 px-4 py-8 pb-14 flex justify-around items-center z-40 shadow-[0_-20px_60px_rgba(0,0,0,0.2)]">
+          <button onClick={() => handleSetCurrentView('dashboard')} className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all">
+            <span className="material-symbols-outlined text-6xl">home</span>
+            <span className="text-xl font-black mt-2 uppercase tracking-tighter">HOME</span>
           </button>
-          <button className="flex flex-col items-center text-primary group">
-            <span className="material-symbols-outlined text-8xl transition-all group-active:scale-95" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant_menu</span>
-            <span className="text-3xl font-black mt-2 uppercase tracking-tighter">PESO</span>
+          <button className="flex flex-col items-center text-primary group active:scale-90 transition-all">
+            <span className="material-symbols-outlined text-6xl" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant_menu</span>
+            <span className="text-xl font-black mt-2 uppercase tracking-tighter">PESO</span>
           </button>
-          <button className="flex flex-col items-center text-[#618961] group">
-            <span className="material-symbols-outlined text-8xl transition-all group-active:scale-95">emoji_events</span>
-            <span className="text-3xl font-black mt-2 uppercase tracking-tighter">PREMI</span>
+          <button className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all">
+            <span className="material-symbols-outlined text-6xl">emoji_events</span>
+            <span className="text-xl font-black mt-2 uppercase tracking-tighter">PREMI</span>
           </button>
-          <button onClick={() => router.push('/profile')} className="flex flex-col items-center text-[#618961] group">
-            <span className="material-symbols-outlined text-4xl transition-all group-active:scale-95">account_circle</span>
-            <span className="text-xs font-black mt-1 uppercase tracking-tighter">PROFILO</span>
+          <button onClick={() => router.push('/profile')} className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all">
+            <span className="material-symbols-outlined text-6xl">account_circle</span>
+            <span className="text-xl font-black mt-2 uppercase tracking-tighter">PROFILO</span>
           </button>
         </nav>
       </div>
@@ -795,26 +806,26 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Navigation Bar (iOS Style) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-background-dark border-t-8 border-[#13ec13]/20 px-4 py-8 pb-14 flex justify-between items-center z-20 shadow-[0_-20px_60px_rgba(0,0,0,0.15)]">
-        <button onClick={() => handleSetCurrentView('dashboard')} className="flex flex-col items-center text-primary group text-center px-1">
-          <span className="material-symbols-outlined text-4xl transition-all group-active:scale-95" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
-          <span className="text-xs font-black mt-1 uppercase tracking-tighter">HOME</span>
+      {/* Unified Bold Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-background-dark border-t-8 border-[#13ec13]/20 px-4 py-8 pb-14 flex justify-around items-center z-40 shadow-[0_-20px_60px_rgba(0,0,0,0.2)]">
+        <button onClick={() => handleSetCurrentView('dashboard')} className="flex flex-col items-center text-primary group active:scale-90 transition-all">
+          <span className="material-symbols-outlined text-6xl" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
+          <span className="text-xl font-black mt-2 uppercase tracking-tighter">HOME</span>
         </button>
-        <button onClick={() => handleSetCurrentView('weight')} className="flex flex-col items-center text-[#618961] group text-center px-1">
-          <span className="material-symbols-outlined text-[6rem] transition-all group-active:scale-95">restaurant_menu</span>
-          <span className="text-5xl font-black mt-2 uppercase tracking-tighter">PESO</span>
+        <button onClick={() => handleSetCurrentView('weight')} className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all">
+          <span className="material-symbols-outlined text-6xl">restaurant_menu</span>
+          <span className="text-xl font-black mt-2 uppercase tracking-tighter">PESO</span>
         </button>
-        <button className="flex flex-col items-center text-[#618961] group text-center px-1">
-          <span className="material-symbols-outlined text-[6rem] transition-all group-active:scale-95">emoji_events</span>
-          <span className="text-5xl font-black mt-2 uppercase tracking-tighter">PREMI</span>
+        <button className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all">
+          <span className="material-symbols-outlined text-6xl">emoji_events</span>
+          <span className="text-xl font-black mt-2 uppercase tracking-tighter">PREMI</span>
         </button>
         <button
           onClick={() => router.push('/profile')}
-          className="flex flex-col items-center text-[#618961] group text-center px-1"
+          className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all"
         >
-          <span className="material-symbols-outlined text-4xl transition-all group-active:scale-95">account_circle</span>
-          <span className="text-xs font-black mt-1 uppercase tracking-tighter">PROFILO</span>
+          <span className="material-symbols-outlined text-6xl">account_circle</span>
+          <span className="text-xl font-black mt-2 uppercase tracking-tighter">PROFILO</span>
         </button>
       </div>
     </div>
