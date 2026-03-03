@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { Trash2, TrendingUp, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity, Loader2, AlertTriangle, User } from 'lucide-react';
@@ -478,7 +478,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="bg-[#0a150a] border-2 border-white/5 rounded-[3rem] p-10 h-[28rem] relative shadow-2xl">
+            <div className="bg-[#0a150a] border-2 border-white/5 rounded-[3rem] p-10 h-[28rem] relative shadow-2xl flex flex-col overflow-hidden">
               <div className="absolute top-6 right-8 flex items-center gap-6 text-xs font-black text-white/40 uppercase tracking-[0.2em]">
                 <div className="flex items-center gap-2">
                   <div className="size-3 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
@@ -486,36 +486,37 @@ export default function Home() {
                 </div>
               </div>
 
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 40, right: 0, left: -30, bottom: 0 }}>
-                  <XAxis
-                    dataKey="day"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: 900 }}
-                    dy={15}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                    contentStyle={{ backgroundColor: '#121c12', border: '2px solid rgba(255,255,255,0.1)', borderRadius: '24px', fontWeight: 900 }}
-                  />
-                  <ReferenceLine y={targetWeight} stroke="#ef4444" strokeWidth={4} strokeDasharray="10 10" />
-                  <Bar dataKey="weight" radius={[12, 12, 0, 0]} barSize={40}>
-                    {chartData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.weight > 0 ? (index === chartData.length - 1 ? '#22c55e' : 'rgba(34,197,94,0.3)') : 'transparent'}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-
-              {currentWeight > 0 && (
-                <div className="absolute right-6 top-[35%] text-[#22c55e] text-2xl font-black italic drop-shadow-lg">
-                  {currentWeight}
-                </div>
-              )}
+              <div className="flex-1 w-full min-h-0 mt-8">
+                <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0}>
+                  <BarChart data={chartData} margin={{ top: 40, right: 0, left: -30, bottom: 0 }}>
+                    <XAxis
+                      dataKey="day"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: 900 }}
+                      dy={15}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                      contentStyle={{ backgroundColor: '#121c12', border: '2px solid rgba(255,255,255,0.1)', borderRadius: '24px', fontWeight: 900 }}
+                    />
+                    <ReferenceLine y={targetWeight} stroke="#ef4444" strokeWidth={4} strokeDasharray="10 10" />
+                    <Bar dataKey="weight" radius={[12, 12, 0, 0]} barSize={40}>
+                      {chartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.weight > 0 ? (index === chartData.length - 1 ? '#22c55e' : 'rgba(34,197,94,0.3)') : 'transparent'}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                {currentWeight > 0 && (
+                  <div className="absolute right-6 top-[35%] text-[#22c55e] text-2xl font-black italic drop-shadow-lg">
+                    {currentWeight}
+                  </div>
+                )}
+              </div>
             </div>
           </section>
 
