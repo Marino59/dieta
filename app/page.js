@@ -68,11 +68,13 @@ export default function Home() {
             if (profileData && !initialCoachFetched) {
               initialCoachFetched = true;
               const today = new Date().toISOString().split('T')[0];
+              // Use a cache key that includes meal count and weight count to force refresh on data changes
+              const cacheKey = `coachAdvice_${today}_m${mealsData.length}_w${weightsData.length}`;
               const cached = localStorage.getItem('coachAdviceCache');
 
               if (cached) {
-                const { advice, date } = JSON.parse(cached);
-                if (date === today) {
+                const { advice, key } = JSON.parse(cached);
+                if (key === cacheKey) {
                   setCoachAdvice(advice);
                   setLoadingCoach(false);
                   return;
@@ -83,7 +85,7 @@ export default function Home() {
               getDailyCoachAdvice(profileData, mealsData.reduce((sum, m) => sum + (m.calories || 0), 0), weightsData)
                 .then(advice => {
                   setCoachAdvice(advice);
-                  localStorage.setItem('coachAdviceCache', JSON.stringify({ advice, date: today }));
+                  localStorage.setItem('coachAdviceCache', JSON.stringify({ advice, key: cacheKey }));
                 })
                 .catch(err => console.error(err))
                 .finally(() => setLoadingCoach(false));
