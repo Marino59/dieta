@@ -80,7 +80,7 @@ export default function Home() {
               }
 
               setLoadingCoach(true);
-              getDailyCoachAdvice(profileData, mealsData.reduce((sum, m) => sum + (m.calories || 0), 0))
+              getDailyCoachAdvice(profileData, mealsData.reduce((sum, m) => sum + (m.calories || 0), 0), weightsData)
                 .then(advice => {
                   setCoachAdvice(advice);
                   localStorage.setItem('coachAdviceCache', JSON.stringify({ advice, date: today }));
@@ -665,13 +665,13 @@ export default function Home() {
               </div>
 
               {loadingCoach ? (
-                <div className="flex items-center gap-6 py-10">
-                  <div className="animate-spin size-8 border-4 border-primary border-t-transparent rounded-full"></div>
-                  <p className="text-xl text-[#618961] italic font-black">STRIZZO IL CERVELLO...</p>
+                <div className="flex items-center gap-6 py-8">
+                  <div className="animate-spin size-10 border-4 border-primary border-t-transparent rounded-full"></div>
+                  <p className="text-2xl text-[#618961] italic font-black">STRIZZO IL CERVELLO...</p>
                 </div>
               ) : coachAdvice ? (
                 <div className="space-y-12">
-                  <p className="text-3xl font-black leading-tight italic text-[#111811] dark:text-white">
+                  <p className="text-4xl sm:text-5xl font-black leading-tight italic text-[#111811] dark:text-white">
                     "{coachAdvice.tip}"
                   </p>
 
