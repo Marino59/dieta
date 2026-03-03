@@ -749,22 +749,22 @@ export default function Home() {
                     onDoubleClick={() => setEditingMeal(meal)}
                     onTouchStart={handleTouchStart}
                     onTouchEnd={handleTouchEnd}
-                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 shadow-sm active:scale-95 transition-transform ${meal.status === 'pending' ? 'bg-primary/5 dark:bg-primary/5 border-primary/20 cursor-wait' : meal.status === 'error' ? 'bg-red-50 dark:bg-red-950/20 border-red-500/20' : 'bg-white dark:bg-background-dark border-[#dbe6db] dark:border-white/20'}`}
+                    className={`flex items-center gap-6 p-8 rounded-[2.5rem] border-4 shadow-md active:scale-95 transition-transform ${meal.status === 'pending' ? 'bg-primary/5 dark:bg-primary/5 border-primary/20 cursor-wait' : meal.status === 'error' ? 'bg-red-50 dark:bg-red-950/20 border-red-500/20' : 'bg-white dark:bg-background-dark border-[#dbe6db] dark:border-white/20'}`}
                   >
-                    <div className={`size-12 rounded-xl flex items-center justify-center ${meal.status === 'error' ? 'bg-red-500/20 text-red-500' : 'bg-primary/20 text-primary'}`}>
+                    <div className={`size-20 rounded-2xl flex items-center justify-center ${meal.status === 'error' ? 'bg-red-500/20 text-red-500' : 'bg-primary/20 text-primary'}`}>
                       {meal.status === 'pending' ? (
-                        <Loader2 className="animate-spin text-2xl" />
+                        <Loader2 className="animate-spin text-4xl" />
                       ) : meal.status === 'error' ? (
-                        <AlertTriangle className="text-2xl" />
+                        <AlertTriangle className="text-4xl" />
                       ) : (
-                        <span className="material-symbols-outlined text-2xl">restaurant</span>
+                        <span className="material-symbols-outlined text-5xl">restaurant</span>
                       )}
                     </div>
                     <div className="flex-1">
-                      <h4 className={`text-2xl font-black capitalize ${meal.status === 'error' ? 'text-red-500 dark:text-red-400' : 'text-[#111811] dark:text-white'}`}>{meal.name}</h4>
-                      {meal.status === 'error' && <p className="text-sm font-bold text-red-500/70">{meal.analysis}</p>}
+                      <h4 className={`text-4xl font-black capitalize ${meal.status === 'error' ? 'text-red-500 dark:text-red-400' : 'text-[#111811] dark:text-white'}`}>{meal.name}</h4>
+                      {meal.status === 'error' && <p className="text-xl font-bold text-red-500/70">{meal.analysis}</p>}
                       {meal.status !== 'pending' && meal.status !== 'error' && (
-                        <p className="text-xl text-[#618961] mt-2 font-bold">{meal.quantity}g</p>
+                        <p className="text-2xl text-[#618961] mt-2 font-bold">{meal.quantity}g</p>
                       )}
                     </div>
                     <div className="text-right">
@@ -774,8 +774,8 @@ export default function Home() {
                         <p className="text-xl font-bold text-red-500 underline mt-2">Modifica</p>
                       ) : (
                         <>
-                          <p className="text-xl font-black text-[#111811] dark:text-white">{meal.calories} kcal</p>
-                          <p className="text-sm text-[#618961] font-bold mt-1">{new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                          <p className="text-3xl font-black text-[#111811] dark:text-white white-nowrap">{meal.calories} kcal</p>
+                          <p className="text-lg text-[#618961] font-bold mt-1">{new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                         </>
                       )}
                     </div>
