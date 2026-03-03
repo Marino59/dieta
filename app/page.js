@@ -68,8 +68,9 @@ export default function Home() {
             if (profileData && !initialCoachFetched) {
               initialCoachFetched = true;
               const today = new Date().toISOString().split('T')[0];
-              // Use a cache key that includes meal count and weight count to force refresh on data changes
-              const cacheKey = `coachAdvice_${today}_m${mealsData.length}_w${weightsData.length}`;
+              // Use a cache key that includes userId, meal count and weight count 
+              // to force refresh on data changes and prevent leaks on shared devices
+              const cacheKey = `coachAdvice_${auth.currentUser.uid}_${today}_m${mealsData.length}_w${weightsData.length}`;
               const cached = localStorage.getItem('coachAdviceCache');
 
               if (cached) {
