@@ -140,11 +140,26 @@ export default function Home() {
     const today = new Date().toISOString().split('T')[0];
     const totalCals = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
     const cacheKey = `coachAdvice_${user.uid}_${today}_m${meals.length}_c${totalCals}_w${weights.length}`;
-    const cached = localStorage.getItem('coachAdviceCache');
 
-    if (cached) {
-      const { advice, key } = JSON.parse(cached);
+    // Check cache and timestamp for "cooldown"
+    const cachedData = localStorage.getItem('coachAdviceCache');
+    const now = Date.now();
+    const FIFTEEN_MINUTES = 15 * 60 * 1000;
+
+    if (cachedData) {
+      const { advice, key, timestamp } = JSON.parse(cachedData);
+
+      // If the key is the same, use it
       if (key === cacheKey) {
+        setCoachAdvice(advice);
+        setLoadingCoach(false);
+        return;
+      }
+
+      // If the key is different (something changed), but we fetched recently (< 15 min),
+      // we DON'T re-fetch automatically to save quota. The user will see the slightly outdated advice
+      // until the cooldown expires or they do something major.
+      if (timestamp && (now - timestamp) < FIFTEEN_MINUTES) {
         setCoachAdvice(advice);
         setLoadingCoach(false);
         return;
@@ -157,7 +172,11 @@ export default function Home() {
       .then(advice => {
         if (advice) {
           setCoachAdvice(advice);
-          localStorage.setItem('coachAdviceCache', JSON.stringify({ advice, key: cacheKey }));
+          localStorage.setItem('coachAdviceCache', JSON.stringify({
+            advice,
+            key: cacheKey,
+            timestamp: Date.now()
+          }));
         }
       })
       .catch(err => console.error("Coach fetch error:", err))
