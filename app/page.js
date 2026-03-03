@@ -552,7 +552,7 @@ export default function Home() {
                     key={period}
                     onClick={() => setWeightPeriod(period)}
                     className={cn(
-                      "px-6 py-3 text-sm font-black rounded-xl transition-all uppercase tracking-tighter",
+                      "px-8 py-4 text-2xl font-black rounded-2xl transition-all uppercase tracking-tighter",
                       weightPeriod === period ? "bg-[#22c55e] text-[#050a05]" : "text-white/40 hover:text-white/60"
                     )}
                   >
@@ -563,10 +563,10 @@ export default function Home() {
             </div>
 
             <div className="bg-[#0a150a] border-2 border-white/5 rounded-[3rem] p-10 h-[28rem] relative shadow-2xl flex flex-col overflow-hidden">
-              <div className="absolute top-6 right-8 flex items-center gap-6 text-xs font-black text-white/40 uppercase tracking-[0.2em]">
+              <div className="absolute top-6 right-8 flex items-center gap-6 text-xl font-black text-white/40 uppercase tracking-[0.2em]">
                 <div className="flex items-center gap-2">
-                  <div className="size-3 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
-                  Obiettivo: {targetWeight}kg
+                  <div className="size-4 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+                  Obiettivo: {targetWeight > 0 ? `${targetWeight}kg` : '--'}
                 </div>
               </div>
 
@@ -578,12 +578,13 @@ export default function Home() {
                         dataKey="day"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: 900 }}
+                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: 900 }}
                         dy={15}
                       />
                       <Tooltip
                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                        contentStyle={{ backgroundColor: '#121c12', border: '2px solid rgba(255,255,255,0.1)', borderRadius: '24px', fontWeight: 900 }}
+                        contentStyle={{ backgroundColor: '#121c12', border: '2px solid rgba(255,255,255,0.2)', borderRadius: '24px', fontWeight: 900, color: '#fff' }}
+                        itemStyle={{ color: '#fff' }}
                       />
                       <ReferenceLine y={targetWeight} stroke="#ef4444" strokeWidth={4} strokeDasharray="10 10" />
                       <Bar dataKey="weight" radius={[12, 12, 0, 0]} barSize={40}>
@@ -598,7 +599,7 @@ export default function Home() {
                   </ResponsiveContainer>
                 )}
                 {currentWeight > 0 && (
-                  <div className="absolute right-6 top-[35%] text-[#22c55e] text-2xl font-black italic drop-shadow-lg">
+                  <div className="absolute right-6 top-[30%] text-white text-4xl font-black italic drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
                     {currentWeight}
                   </div>
                 )}
