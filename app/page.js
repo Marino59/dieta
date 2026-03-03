@@ -9,6 +9,23 @@ import { getDailyCoachAdvice, getHungryAdvice } from "@/lib/ai";
 import ConfirmMealModal from '@/components/ConfirmMealModal';
 import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  Cell
+} from 'recharts';
+import { motion } from 'framer-motion';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
 
 export default function Home() {
   const authContext = useAuth();
@@ -201,6 +218,53 @@ export default function Home() {
     }
   };
 
+  // Weight Monitoring Logic
+  const sortedWeights = [...weights].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const currentWeight = sortedWeights.length > 0 ? sortedWeights[sortedWeights.length - 1].weight : 0;
+  const initialWeight = sortedWeights.length > 0 ? sortedWeights[0].weight : 0;
+  const targetWeight = profile?.targetWeight || 0;
+
+  const weightLost = initialWeight > 0 ? (initialWeight - currentWeight).toFixed(1) : 0;
+  const weightMissing = currentWeight > targetWeight ? (currentWeight - targetWeight).toFixed(1) : 0;
+
+  // Calculate Weekly Delta
+  const getWeeklyDelta = () => {
+    if (sortedWeights.length < 2) return 0;
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    const thisWeekWeights = sortedWeights.filter(w => new Date(w.created_at) >= oneWeekAgo);
+    const lastWeekWeights = sortedWeights.filter(w => new Date(w.created_at) >= twoWeeksAgo && new Date(w.created_at) < oneWeekAgo);
+
+    if (thisWeekWeights.length === 0 || lastWeekWeights.length === 0) {
+      // Fallback: compare latest to previous
+      return (currentWeight - sortedWeights[sortedWeights.length - 2].weight).toFixed(1);
+    }
+
+    const avgThisWeek = thisWeekWeights.reduce((sum, w) => sum + w.weight, 0) / thisWeekWeights.length;
+    const avgLastWeek = lastWeekWeights.reduce((sum, w) => sum + w.weight, 0) / lastWeekWeights.length;
+
+    return (avgThisWeek - avgLastWeek).toFixed(1);
+  };
+
+  const weeklyDelta = getWeeklyDelta();
+
+  // Prepare Chart Data (Last 7 Days)
+  const chartData = (() => {
+    const days = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB'];
+    const result = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayLabel = days[d.getDay()];
+      const dayWeights = weights.filter(w => new Date(w.created_at).toDateString() === d.toDateString());
+      const weight = dayWeights.length > 0 ? dayWeights[dayWeights.length - 1].weight : 0;
+      result.push({ day: dayLabel, weight });
+    }
+    return result;
+  })();
+
   const handleHoFame = async () => {
     try {
       setLoadingHungry(true);
@@ -303,190 +367,209 @@ export default function Home() {
 
   if (currentView === 'weight') {
     return (
-      <div className="bg-background-light dark:bg-background-dark min-h-screen text-[#111811] dark:text-white pb-32 flex flex-col antialiased font-sans">
-        <header className="sticky top-0 z-30 bg-white dark:bg-background-dark border-b-8 border-[#13ec13]/20 px-6 py-12">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => handleSetCurrentView('dashboard')}
-              className="flex items-center justify-center w-20 h-20 rounded-[2rem] bg-primary/10 text-primary active:scale-90 transition-all border-4 border-primary/20"
-            >
-              <ChevronLeft size={48} strokeWidth={4} />
-            </button>
-            <h1 className="text-5xl font-black italic tracking-tighter uppercase text-[#111811] dark:text-white">Il Tuo Peso</h1>
-            <div className="w-20"></div>
-          </div>
+      <div className="min-h-screen bg-[#050a05] text-white font-sans pb-32 flex flex-col antialiased">
+        {/* Header */}
+        <header className="flex items-center justify-between px-6 py-8 sticky top-0 bg-[#050a05]/80 backdrop-blur-md z-30">
+          <button
+            onClick={() => handleSetCurrentView('dashboard')}
+            className="p-4 hover:bg-white/5 rounded-full transition-colors"
+          >
+            <ChevronLeft size={32} />
+          </button>
+          <h1 className="text-3xl font-black italic uppercase tracking-tighter">Monitoraggio Peso</h1>
+          <div className="w-12" />
         </header>
 
-        <main className="flex-1 px-4 py-8 space-y-10">
-          {/* Quick Add Section */}
-          <section className="bg-white dark:bg-background-dark rounded-[4rem] p-12 border-8 border-[#dbe6db] dark:border-white/10 shadow-3xl">
-            <div className="flex items-center gap-6 mb-12">
-              <div className="p-6 rounded-[2rem] bg-primary/20 text-primary border-4 border-primary/20">
-                <TrendingUp size={48} strokeWidth={3} />
+        <main className="flex-1 px-4 space-y-10 max-w-md mx-auto w-full py-4">
+          {/* Current Weight Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-[#0a150a] border-2 border-white/5 rounded-[3rem] p-10 text-center shadow-2xl"
+          >
+            <p className="text-white/50 text-base font-black uppercase tracking-[0.2em] mb-4">Peso Attuale</p>
+            <div className="flex items-baseline justify-center gap-2">
+              <span className="text-8xl font-black text-[#22c55e] italic">{currentWeight || "--.-"}</span>
+              <span className="text-3xl font-bold text-[#22c55e]/70">kg</span>
+            </div>
+            <div className={cn("mt-6 flex items-center justify-center gap-2", weeklyDelta <= 0 ? "text-[#22c55e]" : "text-red-500")}>
+              <TrendingUp className={cn("size-6", weeklyDelta > 0 && "rotate-180")} />
+              <span className="text-xl font-black italic">{weeklyDelta > 0 ? "+" : ""}{weeklyDelta} kg questa settimana</span>
+            </div>
+          </motion.div>
+
+          {/* Update Progress CTA */}
+          <div className="bg-[#121c12] rounded-[2.5rem] p-8 flex items-center justify-between border-2 border-white/5 shadow-xl">
+            <div>
+              <h3 className="text-2xl font-black text-white italic uppercase tracking-tight">Aggiorna progresso</h3>
+              <p className="text-white/40 text-lg font-bold">Inserisci il peso di oggi</p>
+            </div>
+            <button
+              onClick={() => setIsAddingWeight(true)}
+              className="bg-[#22c55e] hover:bg-[#1eb054] text-[#050a05] font-black px-8 py-5 rounded-[1.5rem] transition-all active:scale-95 shadow-[0_15px_30px_rgba(34,197,94,0.3)] text-xl uppercase italic"
+            >
+              Inserisci
+            </button>
+          </div>
+
+          {/* Add Weight Modal/Overlay */}
+          {isAddingWeight && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050a05]/95 backdrop-blur-xl">
+              <div className="w-full max-w-lg bg-[#0a150a] border-4 border-primary/20 rounded-[4rem] p-12 shadow-4xl">
+                <div className="flex items-center justify-between mb-12">
+                  <h2 className="text-4xl font-black italic uppercase tracking-tighter text-white">Nuova Pesata</h2>
+                  <button onClick={() => setIsAddingWeight(false)} className="size-16 rounded-full bg-white/5 flex items-center justify-center">
+                    <Plus className="rotate-45 size-10" />
+                  </button>
+                </div>
+                <div className="space-y-12">
+                  <div className="relative">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      autoFocus
+                      value={newWeightValue}
+                      onChange={(e) => setNewWeightValue(e.target.value)}
+                      placeholder="00.0"
+                      className="w-full text-[10rem] font-black bg-transparent text-center border-b-8 border-primary/20 focus:border-primary outline-none py-4 text-white transition-all placeholder:text-white/10"
+                    />
+                    <span className="absolute bottom-8 right-0 text-5xl font-black text-primary italic uppercase">KG</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="bg-white/5 p-8 rounded-[2.5rem] flex flex-col items-center gap-4 border-2 border-white/5">
+                      <Calendar className="text-primary" size={48} />
+                      <input type="date" value={weightDate} onChange={(e) => setWeightDate(e.target.value)} className="bg-transparent text-3xl font-black outline-none text-center w-full" />
+                    </div>
+                    <div className="bg-white/5 p-8 rounded-[2.5rem] flex flex-col items-center gap-4 border-2 border-white/5">
+                      <Clock className="text-primary" size={48} />
+                      <input type="time" value={weightTime} onChange={(e) => setWeightTime(e.target.value)} className="bg-transparent text-3xl font-black outline-none text-center w-full" />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleAddWeight}
+                    disabled={!newWeightValue || loading}
+                    className="w-full h-32 rounded-[2.5rem] bg-primary text-[#111811] font-black text-4xl shadow-3xl active:scale-95 transition-all flex items-center justify-center gap-6 disabled:opacity-30 uppercase italic"
+                  >
+                    {loading ? <Activity className="animate-spin text-5xl" /> : <Plus size={48} strokeWidth={5} />}
+                    Salva Peso
+                  </button>
+                </div>
               </div>
-              <h2 className="text-4xl font-black italic text-[#111811] dark:text-white uppercase tracking-tighter">Nuova Pesata</h2>
+            </div>
+          )}
+
+          {/* Trend Section */}
+          <section className="space-y-6">
+            <div className="flex items-center justify-between px-2">
+              <h2 className="text-4xl font-black italic uppercase tracking-tighter">Andamento</h2>
+              <div className="flex bg-white/5 p-2 rounded-2xl">
+                {['SETT', 'MESE', 'ANNO'].map((period) => (
+                  <button
+                    key={period}
+                    className={cn(
+                      "px-6 py-3 text-sm font-black rounded-xl transition-all uppercase tracking-tighter",
+                      period === 'SETT' ? "bg-[#22c55e] text-[#050a05]" : "text-white/40 hover:text-white/60"
+                    )}
+                  >
+                    {period}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="space-y-12">
-              <div className="relative group">
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.1"
-                  value={newWeightValue}
-                  onChange={(e) => setNewWeightValue(e.target.value)}
-                  placeholder="00.0"
-                  className="w-full text-[10rem] font-black bg-transparent text-center border-b-8 border-primary/20 focus:border-primary outline-none py-4 dark:text-white transition-all placeholder:text-[#dbe6db]"
-                />
-                <span className="absolute bottom-8 right-0 text-5xl font-black text-primary italic uppercase tracking-widest">KG</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-8">
-                <div className="bg-primary/5 p-8 rounded-[2.5rem] flex flex-col items-center gap-4 border-4 border-primary/10 active:bg-primary/10 transition-colors">
-                  <Calendar className="text-primary" size={48} strokeWidth={3} />
-                  <input
-                    type="date"
-                    value={weightDate}
-                    onChange={(e) => setWeightDate(e.target.value)}
-                    className="bg-transparent text-3xl font-black outline-none text-center w-full text-[#111811] dark:text-white"
-                  />
-                </div>
-                <div className="bg-primary/5 p-8 rounded-[2.5rem] flex flex-col items-center gap-4 border-4 border-primary/10 active:bg-primary/10 transition-colors">
-                  <Clock className="text-primary" size={48} strokeWidth={3} />
-                  <input
-                    type="time"
-                    value={weightTime}
-                    onChange={(e) => setWeightTime(e.target.value)}
-                    className="bg-transparent text-3xl font-black outline-none text-center w-full text-[#111811] dark:text-white"
-                  />
+            <div className="bg-[#0a150a] border-2 border-white/5 rounded-[3rem] p-10 h-[28rem] relative shadow-2xl">
+              <div className="absolute top-6 right-8 flex items-center gap-6 text-xs font-black text-white/40 uppercase tracking-[0.2em]">
+                <div className="flex items-center gap-2">
+                  <div className="size-3 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+                  Obiettivo: {targetWeight}kg
                 </div>
               </div>
 
-              <button
-                onClick={handleAddWeight}
-                disabled={!newWeightValue || loading}
-                className="w-full h-32 rounded-[2.5rem] bg-primary text-[#111811] font-black text-4xl shadow-[0_20px_50px_rgba(19,236,19,0.3)] active:scale-95 transition-all flex items-center justify-center gap-6 disabled:opacity-30 uppercase tracking-tighter"
-              >
-                {loading ? <Activity className="animate-spin text-5xl" /> : <Plus size={48} strokeWidth={5} />}
-                Salva Peso
-              </button>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 40, right: 0, left: -30, bottom: 0 }}>
+                  <XAxis
+                    dataKey="day"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: 900 }}
+                    dy={15}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                    contentStyle={{ backgroundColor: '#121c12', border: '2px solid rgba(255,255,255,0.1)', borderRadius: '24px', fontWeight: 900 }}
+                  />
+                  <ReferenceLine y={targetWeight} stroke="#ef4444" strokeWidth={4} strokeDasharray="10 10" />
+                  <Bar dataKey="weight" radius={[12, 12, 0, 0]} barSize={40}>
+                    {chartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.weight > 0 ? (index === chartData.length - 1 ? '#22c55e' : 'rgba(34,197,94,0.3)') : 'transparent'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+
+              {currentWeight > 0 && (
+                <div className="absolute right-6 top-[35%] text-[#22c55e] text-2xl font-black italic drop-shadow-lg">
+                  {currentWeight}
+                </div>
+              )}
             </div>
           </section>
 
-          {/* Bold Chart Visualization */}
-          {weights.length > 1 && (
-            <section className="bg-white dark:bg-background-dark rounded-[4rem] p-12 border-8 border-[#dbe6db] dark:border-white/10 shadow-3xl overflow-hidden">
-              <div className="flex items-center gap-6 mb-12">
-                <Activity className="text-primary" size={56} strokeWidth={3} />
-                <h2 className="text-4xl font-black italic text-[#111811] dark:text-white uppercase tracking-tighter">Andamento</h2>
-              </div>
-              <div className="h-80 w-full relative mt-8">
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  {(() => {
-                    const minWeight = Math.min(...weights.map(w => w.weight)) - 2;
-                    const maxWeight = Math.max(...weights.map(w => w.weight)) + 2;
-                    const range = maxWeight - minWeight;
-                    const points = weights.map((w, i) => {
-                      const x = (i / (weights.length - 1)) * 100;
-                      const y = 100 - ((w.weight - minWeight) / range) * 100;
-                      return `${x},${y}`;
-                    }).join(' ');
+          {/* Stats Grid */}
+          <div className="grid grid-cols-3 gap-4 px-1">
+            <StatCard label="Iniziale" value={`${initialWeight} kg`} />
+            <StatCard label="Persi" value={`${weightLost} kg`} accent />
+            <StatCard label="Mancanti" value={`${weightMissing} kg`} />
+          </div>
 
-                    return (
-                      <>
-                        <polyline
-                          points={points}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="10"
-                          className="text-primary/30"
-                          vectorEffect="non-scaling-stroke"
-                          style={{ strokeLinejoin: 'round', strokeLinecap: 'round' }}
-                        />
-                        <polyline
-                          points={points}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="6"
-                          className="text-primary"
-                          vectorEffect="non-scaling-stroke"
-                          style={{ strokeLinejoin: 'round', strokeLinecap: 'round' }}
-                        />
-                        {weights.map((w, i) => {
-                          const x = (i / (weights.length - 1)) * 100;
-                          const y = 100 - ((w.weight - minWeight) / range) * 100;
-                          return (
-                            <circle
-                              key={w.id}
-                              cx={x}
-                              cy={y}
-                              r="3"
-                              className="fill-white stroke-primary stroke-[1px] shadow-sm"
-                            />
-                          );
-                        })}
-                      </>
-                    );
-                  })()}
-                </svg>
-              </div>
-              <div className="flex justify-between mt-10 px-2 text-2xl font-black text-[#111811] dark:text-white/60 uppercase tracking-widest">
-                <span>{new Date(weights[0].created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}</span>
-                <span>{new Date(weights[weights.length - 1].created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}</span>
-              </div>
-            </section>
-          )}
-
-          {/* Bold History List */}
-          <section className="space-y-8 pb-12">
-            <h3 className="text-4xl font-black italic ml-6 text-[#111811] dark:text-white uppercase tracking-tighter">Storico</h3>
-            <div className="space-y-6">
-              {weights.length === 0 ? (
-                <p className="text-center text-[#618961] py-20 text-3xl font-black bg-white dark:bg-background-dark rounded-[3rem] border-8 border-[#dbe6db] dark:border-white/10">Nessun dato registrato.</p>
+          {/* History Section */}
+          <section className="space-y-6 pb-12">
+            <h2 className="text-4xl font-black italic uppercase tracking-tighter px-2">Cronologia</h2>
+            <div className="space-y-4">
+              {sortedWeights.length === 0 ? (
+                <p className="text-center text-white/30 py-20 text-2xl font-black bg-white/5 border-2 border-white/5 rounded-[3rem]">Nessun dato registrato.</p>
               ) : (
-                [...weights].reverse().map(w => (
-                  <div key={w.id} className="flex items-center gap-8 bg-white dark:bg-background-dark p-8 rounded-[3.5rem] border-8 border-[#dbe6db] dark:border-white/20 shadow-xl">
-                    <div className="size-20 rounded-[1.5rem] bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/20 shrink-0">
-                      <TrendingUp size={48} strokeWidth={3} />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-5xl font-black text-[#111811] dark:text-white tracking-tighter italic">
-                        {w.weight}<span className="text-2xl ml-2 text-primary font-black uppercase not-italic">kg</span>
+                [...sortedWeights].reverse().map((item, i) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="bg-[#121c12] border-2 border-white/5 rounded-[2.5rem] p-8 flex items-center justify-between group cursor-pointer hover:bg-[#1a281a] transition-all shadow-lg active:scale-98"
+                  >
+                    <div>
+                      <h4 className="text-2xl font-black text-white italic uppercase tracking-tight">
+                        {new Date(item.created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
                       </h4>
-                      <p className="text-xl text-[#618961] font-bold mt-2 uppercase tracking-wide">
-                        {new Date(w.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'long' })} • {new Date(w.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <p className="text-white/30 text-lg font-bold mt-1">
+                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
-                    <button
-                      onClick={() => handleDeleteWeight(w.id)}
-                      className="size-20 rounded-[1.5rem] bg-red-500/10 text-red-500 flex items-center justify-center active:scale-90 transition-all border-4 border-red-500/10"
-                    >
-                      <Trash2 size={40} strokeWidth={3} />
-                    </button>
-                  </div>
+                    <div className="flex items-center gap-6">
+                      <span className="text-4xl font-black text-[#22c55e] italic">{item.weight}<span className="text-xl ml-1 not-italic font-bold text-white/40">kg</span></span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteWeight(item.id); }}
+                        className="p-3 bg-red-500/10 text-red-500 rounded-2xl active:scale-90 transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 size={24} />
+                      </button>
+                    </div>
+                  </motion.div>
                 ))
               )}
             </div>
           </section>
         </main>
 
-        <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-background-dark border-t-8 border-[#13ec13]/20 px-4 py-8 pb-14 flex justify-around items-center z-40 shadow-[0_-20px_60px_rgba(0,0,0,0.2)]">
-          <button onClick={() => handleSetCurrentView('dashboard')} className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all">
-            <span className="material-symbols-outlined text-6xl">home</span>
-            <span className="text-xl font-black mt-2 uppercase tracking-tighter">HOME</span>
-          </button>
-          <button className="flex flex-col items-center text-primary group active:scale-90 transition-all">
-            <span className="material-symbols-outlined text-6xl" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant_menu</span>
-            <span className="text-xl font-black mt-2 uppercase tracking-tighter">PESO</span>
-          </button>
-          <button className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all">
-            <span className="material-symbols-outlined text-6xl">emoji_events</span>
-            <span className="text-xl font-black mt-2 uppercase tracking-tighter">PREMI</span>
-          </button>
-          <button onClick={() => router.push('/profile')} className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all">
-            <span className="material-symbols-outlined text-6xl">account_circle</span>
-            <span className="text-xl font-black mt-2 uppercase tracking-tighter">PROFILO</span>
-          </button>
+        <nav className="fixed bottom-0 left-0 right-0 bg-[#050a05]/95 backdrop-blur-xl border-t-8 border-white/5 px-4 py-8 pb-14 flex justify-around items-center z-40 shadow-[0_-20px_60px_rgba(0,0,0,0.4)]">
+          <NavItem icon={<Activity />} label="Home" active={false} onClick={() => handleSetCurrentView('dashboard')} />
+          <NavItem icon={<TrendingUp />} label="Peso" active={true} onClick={() => { }} />
+          <NavItem icon={<Monitor />} label="Premi" active={false} onClick={() => { }} />
+          <NavItem icon={<User />} label="Profilo" active={false} onClick={() => router.push('/profile')} />
         </nav>
       </div>
     );
@@ -829,5 +912,34 @@ export default function Home() {
         </button>
       </div>
     </div>
+  );
+}
+
+function StatCard({ label, value, accent = false }) {
+  return (
+    <div className="bg-[#121c12] border-2 border-white/5 rounded-[2rem] p-6 shadow-lg">
+      <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-2">{label}</p>
+      <p className={cn("text-2xl font-black italic", accent ? "text-[#22c55e]" : "text-white")}>{value}</p>
+    </div>
+  );
+}
+
+function NavItem({ icon, label, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center gap-2 transition-all active:scale-90 group",
+        active ? "text-[#22c55e]" : "text-white/30 hover:text-white/50"
+      )}
+    >
+      <div className={cn(
+        "p-4 rounded-[1.5rem] transition-all",
+        active && "bg-[#22c55e]/10 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
+      )}>
+        {React.cloneElement(icon, { size: active ? 40 : 36, strokeWidth: active ? 3 : 2 })}
+      </div>
+      <span className="text-xs font-black uppercase tracking-[0.2em]">{label}</span>
+    </button>
   );
 }
