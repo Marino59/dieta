@@ -64,33 +64,6 @@ export default function Home() {
           unsubscribe = subscribeToMeals(selectedDate, (mealsData) => {
             setMeals(mealsData);
             setLoading(false);
-
-            if (profileData && !initialCoachFetched) {
-              initialCoachFetched = true;
-              const today = new Date().toISOString().split('T')[0];
-              // Use a cache key that includes userId, meal count and weight count 
-              // to force refresh on data changes and prevent leaks on shared devices
-              const cacheKey = `coachAdvice_${auth.currentUser.uid}_${today}_m${mealsData.length}_w${weightsData.length}`;
-              const cached = localStorage.getItem('coachAdviceCache');
-
-              if (cached) {
-                const { advice, key } = JSON.parse(cached);
-                if (key === cacheKey) {
-                  setCoachAdvice(advice);
-                  setLoadingCoach(false);
-                  return;
-                }
-              }
-
-              setLoadingCoach(true);
-              getDailyCoachAdvice(profileData, mealsData.reduce((sum, m) => sum + (m.calories || 0), 0), weightsData)
-                .then(advice => {
-                  setCoachAdvice(advice);
-                  localStorage.setItem('coachAdviceCache', JSON.stringify({ advice, key: cacheKey }));
-                })
-                .catch(err => console.error(err))
-                .finally(() => setLoadingCoach(false));
-            }
           });
         } catch (error) {
           console.error("Failed loading initial data", error);
@@ -102,6 +75,38 @@ export default function Home() {
       return () => unsubscribe();
     }
   }, [user, selectedDate]);
+
+  // Dedicated effect for AI Coach Advice to ensure it refreshes correctly
+  useEffect(() => {
+    if (!user || !profile?.goalDescription || loading) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const cacheKey = `coachAdvice_${user.uid}_${today}_m${meals.length}_w${weights.length}`;
+    const cached = localStorage.getItem('coachAdviceCache');
+
+    if (cached) {
+      const { advice, key } = JSON.parse(cached);
+      if (key === cacheKey) {
+        setCoachAdvice(advice);
+        setLoadingCoach(false);
+        return;
+      }
+    }
+
+    setLoadingCoach(true);
+    const totalCals = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+
+    getDailyCoachAdvice(profile, totalCals, weights)
+      .then(advice => {
+        if (advice) {
+          setCoachAdvice(advice);
+          localStorage.setItem('coachAdviceCache', JSON.stringify({ advice, key: cacheKey }));
+        }
+      })
+      .catch(err => console.error("Coach fetch error:", err))
+      .finally(() => setLoadingCoach(false));
+
+  }, [user, profile, meals.length, weights.length, loading]);
 
   const handleSaveNewMeal = async (confirmedData) => {
     try {
@@ -700,7 +705,18 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <p className="text-3xl font-black text-[#618961] text-center">Configura il profilo per i consigli!</p>
+                <div className="text-center py-6">
+                  <p className="text-2xl font-black text-[#618961] mb-4">Non sono riuscito a caricare i consigli.</p>
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem('coachAdviceCache');
+                      window.location.reload();
+                    }}
+                    className="text-xl font-black text-primary underline uppercase tracking-widest"
+                  >
+                    Riprova ora
+                  </button>
+                </div>
               )}
             </div>
           </div>
