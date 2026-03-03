@@ -9,7 +9,7 @@ export default function NutritionCard({ meal, onEdit, onDelete }) {
         <div className="card-modern p-5 animate-fade-in hover:scale-[1.01] transition-transform">
             <div className="flex justify-between items-start mb-4">
                 <div className="flex-1 min-w-0">
-                    <h3 className="font-black text-white capitalize truncate text-xl mb-2">
+                    <h3 className="font-black text-white capitalize truncate text-lg mb-1">
                         {meal.name}
                     </h3>
                     <div className="flex items-center gap-2 text-sm">
@@ -27,7 +27,7 @@ export default function NutritionCard({ meal, onEdit, onDelete }) {
 
                 <div className="flex flex-col items-end gap-3">
                     <div className="text-right">
-                        <div className="text-4xl font-black text-gradient-primary leading-none">
+                        <div className="text-3xl font-black text-gradient-primary leading-none">
                             {meal.calories}
                         </div>
                         <div className="text-xs text-slate-500 uppercase font-bold tracking-wider mt-1">
@@ -91,7 +91,7 @@ export default function NutritionCard({ meal, onEdit, onDelete }) {
 function MacroItem({ label, value, gradient }) {
     return (
         <div className="glass-panel p-3 rounded-2xl text-center interactive">
-            <div className={`text-2xl font-black mb-1 ${gradient.replace('bg-', 'text-')}`}>
+            <div className={`text-xl font-black mb-1 ${gradient.replace('bg-', 'text-')}`}>
                 {value}
             </div>
             <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2">

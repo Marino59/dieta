@@ -53,9 +53,16 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
         const [hours, minutes] = selectedTimeStr.split(':').map(Number);
         const finalDate = new Date(year, month - 1, day, hours, minutes);
 
+        const originalQuantity = mealData.quantity || 100;
+        const scaleMacro = (val) => Math.round((val / originalQuantity) * quantity) || 0;
+
         onConfirm({
             ...mealData,
             quantity,
+            calories: scaleMacro(mealData.calories),
+            protein: scaleMacro(mealData.protein),
+            carbs: scaleMacro(mealData.carbs),
+            fat: scaleMacro(mealData.fat),
             analysis,
             date: finalDate
         });
@@ -132,11 +139,30 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
 
                     {/* Macros Grid - 2x2 for better visibility */}
                     <div className="grid grid-cols-2 gap-6 sm:gap-8">
-                        <MacroBox label="CALORIE" val={Math.round((mealData.calories / 100) * quantity)} unit="kcal" color="text-white" border="bg-slate-900 border-slate-800" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
-                        <MacroBox label="PROTEINE" val={Math.round((mealData.protein / 100) * quantity)} unit="g" color="text-blue-400" border="bg-blue-950/30 border-blue-900/50" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
-                        <MacroBox label="CARB." val={Math.round((mealData.carbs / 100) * quantity)} unit="g" color="text-emerald-400" border="bg-emerald-950/30 border-emerald-900/50" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
-                        <MacroBox label="GRASSI" val={Math.round((mealData.fat / 100) * quantity)} unit="g" color="text-amber-400" border="bg-amber-950/30 border-amber-900/50" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
+                        {(() => {
+                            const originalQ = mealData.quantity || 100;
+                            const scale = (val) => Math.round((val / originalQ) * quantity) || 0;
+                            return (
+                                <>
+                                    <MacroBox label="CALORIE" val={scale(mealData.calories)} unit="kcal" color="text-white" border="bg-slate-900 border-slate-800" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
+                                    <MacroBox label="PROTEINE" val={scale(mealData.protein)} unit="g" color="text-blue-400" border="bg-blue-950/30 border-blue-900/50" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
+                                    <MacroBox label="CARB." val={scale(mealData.carbs)} unit="g" color="text-emerald-400" border="bg-emerald-950/30 border-emerald-900/50" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
+                                    <MacroBox label="GRASSI" val={scale(mealData.fat)} unit="g" color="text-amber-400" border="bg-amber-950/30 border-amber-900/50" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
+                                </>
+                            );
+                        })()}
                     </div>
+
+                    {/* AI ANALYSIS DISPLAY */}
+                    {analysis && (
+                        <div className={`border-4 rounded-[3rem] p-8 mt-4 shadow-xl ${analysis.includes('⚠️') ? 'bg-red-500/10 border-red-500/50' : 'bg-blue-500/10 border-blue-500/30'}`}>
+                            <h3 className={`font-black text-4xl mb-4 italic uppercase tracking-wider flex items-center gap-4 ${analysis.includes('⚠️') ? 'text-red-400' : 'text-blue-400'}`}>
+                                <span>{analysis.includes('⚠️') ? '⚠️' : '💡'}</span>
+                                {analysis.includes('⚠️') ? "ATTENZIONE ALLA TUA DIETA" : "PARERE DELL'AI"}
+                            </h3>
+                            <p className="text-white text-3xl font-bold leading-relaxed">{analysis}</p>
+                        </div>
+                    )}
 
                     {/* DateTime Section - Enhanced with ORA button */}
                     <div className="flex flex-col gap-6">

@@ -39,6 +39,9 @@ export default function ProfilePage() {
     const [fat, setFat] = useState(60);
     const [aiExplanation, setAiExplanation] = useState('');
 
+    // Diet / Health 
+    const [dietaryRestrictions, setDietaryRestrictions] = useState('');
+
     useEffect(() => {
         if (!authLoading && !user) router.push('/login');
     }, [user, authLoading, router]);
@@ -74,6 +77,7 @@ export default function ProfilePage() {
                 setCarbs(profile.carbs || 200);
                 setFat(profile.fat || 60);
                 setAiExplanation(profile.aiExplanation || '');
+                setDietaryRestrictions(profile.dietaryRestrictions || '');
             }
         } catch (error) {
             console.error('Error loading profile:', error);
@@ -124,7 +128,8 @@ export default function ProfilePage() {
                 protein,
                 carbs,
                 fat,
-                aiExplanation
+                aiExplanation,
+                dietaryRestrictions
             });
 
             // Clear home coach advice cache to force a refresh with new targets
@@ -235,6 +240,23 @@ export default function ProfilePage() {
                             );
                         })}
                     </div>
+                </section>
+
+                {/* Dietary Restrictions and Pathologies */}
+                <section className="bg-white dark:bg-[#1a2e1a] rounded-[3rem] p-10 shadow-xl border-4 border-[#dbe6db] dark:border-white/10 space-y-8">
+                    <div className="flex items-center gap-4 mb-2 text-primary">
+                        <span className="material-symbols-outlined text-5xl">medical_information</span>
+                        <h2 className="font-black text-3xl uppercase tracking-widest italic flex-1">Caratteristiche e Dieta</h2>
+                    </div>
+
+                    <p className="text-xl font-bold text-[#618961]">Hai allergie, intolleranze, patologie o segui diete specifiche (es: Vegano, Celiaco, Diabete)?</p>
+
+                    <textarea
+                        value={dietaryRestrictions}
+                        onChange={(e) => setDietaryRestrictions(e.target.value)}
+                        placeholder="Esempio: Sono intollerante al lattosio e seguo una dieta vegetariana..."
+                        className="w-full bg-[#f6f8f6] dark:bg-black/20 border-4 border-[#dbe6db] dark:border-white/10 rounded-[2.5rem] px-8 py-8 text-3xl font-bold focus:border-primary outline-none transition-all h-48 resize-none"
+                    />
                 </section>
 
                 {/* AI GOAL DESCRIPTION */}

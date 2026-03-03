@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { Trash2, TrendingUp, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity } from 'lucide-react';
-import { getMeals, deleteMeal, updateMeal, addMeal, getUserProfile, getWeights, addWeight, deleteWeight } from '@/lib/firestore';
+import { Trash2, TrendingUp, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity, Loader2, AlertTriangle } from 'lucide-react';
+import { getMeals, deleteMeal, updateMeal, addMeal, getUserProfile, getWeights, addWeight, deleteWeight, subscribeToMeals } from '@/lib/firestore';
 import { getDailyCoachAdvice, getHungryAdvice } from "@/lib/ai";
 import ConfirmMealModal from '@/components/ConfirmMealModal';
+import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
 
 export default function Home() {
@@ -45,54 +46,59 @@ export default function Home() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (user) fetchData();
-  }, [user, selectedDate]);
+    if (user) {
+      let unsubscribe = () => { };
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [mealsData, profileData, weightsData] = await Promise.all([
-        getMeals(selectedDate),
-        getUserProfile(),
-        getWeights()
-      ]);
-      setMeals(mealsData);
-      setProfile(profileData);
-      setWeights(weightsData);
-
-      // Fetch coach advice with caching
-      if (profileData && !coachAdvice) {
-        const today = new Date().toISOString().split('T')[0];
-        const cached = localStorage.getItem('coachAdviceCache');
-
-        if (cached) {
-          const { advice, date } = JSON.parse(cached);
-          if (date === today) {
-            console.log("Using cached coach advice for today");
-            setCoachAdvice(advice);
-            setLoadingCoach(false);
-            return;
-          }
-        }
-
-        setLoadingCoach(true);
+      const loadInitialData = async () => {
+        setLoading(true);
         try {
-          const advice = await getDailyCoachAdvice(profileData, mealsData.reduce((sum, m) => sum + (m.calories || 0), 0));
-          setCoachAdvice(advice);
-          // Store in cache
-          localStorage.setItem('coachAdviceCache', JSON.stringify({ advice, date: today }));
-        } catch (err) {
-          console.error("Coach advice error:", err);
-        } finally {
-          setLoadingCoach(false);
+          const [profileData, weightsData] = await Promise.all([
+            getUserProfile(),
+            getWeights()
+          ]);
+          setProfile(profileData);
+          setWeights(weightsData);
+
+          let initialCoachFetched = false;
+
+          unsubscribe = subscribeToMeals(selectedDate, (mealsData) => {
+            setMeals(mealsData);
+            setLoading(false);
+
+            if (profileData && !initialCoachFetched) {
+              initialCoachFetched = true;
+              const today = new Date().toISOString().split('T')[0];
+              const cached = localStorage.getItem('coachAdviceCache');
+
+              if (cached) {
+                const { advice, date } = JSON.parse(cached);
+                if (date === today) {
+                  setCoachAdvice(advice);
+                  setLoadingCoach(false);
+                  return;
+                }
+              }
+
+              setLoadingCoach(true);
+              getDailyCoachAdvice(profileData, mealsData.reduce((sum, m) => sum + (m.calories || 0), 0))
+                .then(advice => {
+                  setCoachAdvice(advice);
+                  localStorage.setItem('coachAdviceCache', JSON.stringify({ advice, date: today }));
+                })
+                .catch(err => console.error(err))
+                .finally(() => setLoadingCoach(false));
+            }
+          });
+        } catch (error) {
+          console.error("Failed loading initial data", error);
+          setLoading(false);
         }
-      }
-    } catch (error) {
-      console.error('Failed to load data', error);
-    } finally {
-      setLoading(false);
+      };
+
+      loadInitialData();
+      return () => unsubscribe();
     }
-  };
+  }, [user, selectedDate]);
 
   const handleSaveNewMeal = async (confirmedData) => {
     try {
@@ -115,21 +121,13 @@ export default function Home() {
 
       if (editingMeal) {
         await updateMeal(editingMeal.id, mealData);
-        setMeals((prev) => {
-          const updated = prev.map(m => m.id === editingMeal.id ? { ...m, ...mealData } : m);
-          return [...updated].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-        });
         setEditingMeal(null);
       } else {
         const mealToSave = {
           ...mealData,
           image_path: pendingMealData?.image_path || null,
         };
-        const newMeal = await addMeal(mealToSave);
-        setMeals((prev) => {
-          const updated = [...prev, newMeal];
-          return updated.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-        });
+        await addMeal(mealToSave);
       }
 
       setPendingMealData(null);
@@ -145,6 +143,11 @@ export default function Home() {
   const handleMealIdentified = (data, imageBase64) => {
     setPendingMealData({ ...data, image_path: imageBase64 });
     handleSetCurrentView('confirm-meal');
+  };
+
+  const handleProductEvaluated = (data) => {
+    setPendingMealData(data);
+    handleSetCurrentView('eval-product');
   };
 
   const handleAddWeight = async () => {
@@ -178,6 +181,15 @@ export default function Home() {
       setWeights(prev => prev.filter(w => w.id !== id));
     } catch (error) {
       console.error("Error deleting weight:", error);
+    }
+  };
+
+  const handleDeleteMeal = async (id) => {
+    if (!confirm("Eliminare questo pasto?")) return;
+    try {
+      await deleteMeal(id);
+    } catch (error) {
+      console.error("Error deleting meal:", error);
     }
   };
 
@@ -238,6 +250,18 @@ export default function Home() {
     );
   }
 
+  if (currentView === 'eval-product' && pendingMealData) {
+    return (
+      <ProductEvaluationModal
+        productData={pendingMealData}
+        onClose={() => {
+          setPendingMealData(null);
+          handleSetCurrentView('add-meal');
+        }}
+      />
+    );
+  }
+
   if (currentView === 'add-meal') {
     return (
       <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24 px-4 pt-8 animate-in fade-in duration-500">
@@ -249,15 +273,21 @@ export default function Home() {
             }}
             className="flex items-center gap-4 text-primary font-black text-4xl active:scale-90 transition-transform bg-primary/10 px-8 py-4 rounded-[2rem]"
           >
-            <span className="material-symbols-outlined text-6xl">arrow_back</span>
+            <span className="material-symbols-outlined text-4xl">arrow_back</span>
             INDIETRO
           </button>
-          <span className="text-3xl font-black text-primary/50 uppercase italic tracking-tighter">AGGIUNGI PASTO</span>
+          <span className="text-xl font-black text-primary/50 uppercase italic tracking-tighter">AGGIUNGI PASTO</span>
         </div>
         <CameraInput
+          onMealAdded={() => {
+            handleSetCurrentView('dashboard');
+            setInputMode(null);
+          }}
           onMealIdentified={handleMealIdentified}
+          onProductEvaluated={handleProductEvaluated}
           defaultDate={selectedDate}
           initialMode={inputMode}
+          profile={profile}
         />
       </div>
     );
@@ -272,9 +302,9 @@ export default function Home() {
               onClick={() => handleSetCurrentView('dashboard')}
               className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary active:scale-90 transition-all"
             >
-              <ChevronLeft size={32} />
+              <ChevronLeft size={24} />
             </button>
-            <h1 className="text-4xl font-black italic tracking-tighter uppercase">Il Tuo Peso</h1>
+            <h1 className="text-2xl font-black italic tracking-tighter uppercase">Il Tuo Peso</h1>
             <div className="w-12"></div>
           </div>
         </header>
@@ -284,9 +314,9 @@ export default function Home() {
           <section className="bg-white dark:bg-background-dark rounded-[3rem] p-8 border-4 border-[#dbe6db] dark:border-white/10 shadow-xl">
             <div className="flex items-center gap-4 mb-8">
               <div className="p-4 rounded-3xl bg-primary/20 text-primary">
-                <TrendingUp size={40} />
+                <TrendingUp size={24} />
               </div>
-              <h2 className="text-3xl font-black italic">NUOVA PESATA</h2>
+              <h2 className="text-xl font-black italic">NUOVA PESATA</h2>
             </div>
 
             <div className="space-y-8">
@@ -298,9 +328,9 @@ export default function Home() {
                   value={newWeightValue}
                   onChange={(e) => setNewWeightValue(e.target.value)}
                   placeholder="00.0"
-                  className="w-full text-8xl font-black bg-transparent text-center border-b-8 border-primary/20 focus:border-primary outline-none py-4 dark:text-white transition-colors"
+                  className="w-full text-6xl font-black bg-transparent text-center border-b-4 border-primary/20 focus:border-primary outline-none py-2 dark:text-white transition-colors"
                 />
-                <span className="absolute bottom-6 right-4 text-4xl font-black text-[#618961]">KG</span>
+                <span className="absolute bottom-4 right-4 text-2xl font-black text-[#618961]">KG</span>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -310,7 +340,7 @@ export default function Home() {
                     type="date"
                     value={weightDate}
                     onChange={(e) => setWeightDate(e.target.value)}
-                    className="bg-transparent text-xl font-bold outline-none text-center w-full"
+                    className="bg-transparent text-lg font-bold outline-none text-center w-full"
                   />
                 </div>
                 <div className="bg-primary/5 p-4 rounded-3xl flex flex-col items-center gap-2 border border-primary/10">
@@ -319,7 +349,7 @@ export default function Home() {
                     type="time"
                     value={weightTime}
                     onChange={(e) => setWeightTime(e.target.value)}
-                    className="bg-transparent text-xl font-bold outline-none text-center w-full"
+                    className="bg-transparent text-lg font-bold outline-none text-center w-full"
                   />
                 </div>
               </div>
@@ -327,9 +357,9 @@ export default function Home() {
               <button
                 onClick={handleAddWeight}
                 disabled={!newWeightValue || loading}
-                className="w-full h-24 rounded-[2rem] bg-primary text-[#111811] font-black text-3xl shadow-2xl shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-4 disabled:opacity-30"
+                className="w-full h-16 rounded-2xl bg-primary text-[#111811] font-black text-xl shadow-2xl shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-4 disabled:opacity-30"
               >
-                {loading ? <Activity className="animate-spin" /> : <Plus size={32} strokeWidth={4} />}
+                {loading ? <Activity className="animate-spin" /> : <Plus size={24} strokeWidth={4} />}
                 SALVA PESO
               </button>
             </div>
@@ -403,8 +433,8 @@ export default function Home() {
                       <TrendingUp size={32} />
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-4xl font-black text-[#111811] dark:text-white tracking-tighter">{w.weight}<span className="text-xl ml-1 text-[#618961]">kg</span></h4>
-                      <p className="text-lg text-[#618961] font-bold mt-1">
+                      <h4 className="text-2xl font-black text-[#111811] dark:text-white tracking-tighter">{w.weight}<span className="text-base ml-1 text-[#618961]">kg</span></h4>
+                      <p className="text-sm text-[#618961] font-bold mt-1">
                         {new Date(w.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit' })} • {new Date(w.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
@@ -435,8 +465,8 @@ export default function Home() {
             <span className="text-3xl font-black mt-2 uppercase tracking-tighter">PREMI</span>
           </button>
           <button onClick={() => router.push('/profile')} className="flex flex-col items-center text-[#618961] group">
-            <span className="material-symbols-outlined text-8xl transition-all group-active:scale-95">account_circle</span>
-            <span className="text-3xl font-black mt-2 uppercase tracking-tighter">PROFILO</span>
+            <span className="material-symbols-outlined text-4xl transition-all group-active:scale-95">account_circle</span>
+            <span className="text-xs font-black mt-1 uppercase tracking-tighter">PROFILO</span>
           </button>
         </nav>
       </div>
@@ -447,7 +477,10 @@ export default function Home() {
       {/* Top Navigation Bar */}
       <div className="sticky top-0 z-10 flex flex-col bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-[#dbe6db]/30 shadow-sm">
         <div className="flex items-center px-4 py-8 justify-between">
-          <div className="flex size-24 shrink-0 items-center justify-center">
+          <div
+            onClick={() => router.push('/profile')}
+            className="flex size-24 shrink-0 items-center justify-center cursor-pointer active:scale-95 transition-transform"
+          >
             <div
               className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-24 border-4 border-primary shadow-lg"
               style={{
@@ -455,7 +488,7 @@ export default function Home() {
               }}
             ></div>
           </div>
-          <h1 className="text-[#111811] dark:text-white text-7xl font-black leading-tight tracking-tight flex-1 text-center italic">DIETA</h1>
+          <h1 className="text-[#111811] dark:text-white text-4xl font-black leading-tight tracking-tight flex-1 text-center italic">DIETA</h1>
           <div className="flex w-24 items-center justify-end relative">
             <input
               ref={dateInputRef}
@@ -472,18 +505,18 @@ export default function Home() {
             />
             <button
               onClick={() => dateInputRef.current?.showPicker()}
-              className="flex cursor-pointer items-center justify-center rounded-2xl h-24 w-24 bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-90 shadow-inner border-2 border-primary/20"
+              className="flex cursor-pointer items-center justify-center rounded-2xl h-12 w-12 bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-90 shadow-inner border-2 border-primary/20"
             >
-              <span className="material-symbols-outlined text-8xl">calendar_month</span>
+              <span className="material-symbols-outlined text-3xl">calendar_month</span>
             </button>
           </div>
         </div>
 
         {/* Selected Date Indicator */}
         <div className="px-4 py-6 bg-primary/5 flex items-center justify-between gap-4 border-t-2 border-primary/10">
-          <div className="flex items-center gap-4">
-            <span className="material-symbols-outlined text-5xl text-primary drop-shadow-sm">event</span>
-            <h2 className="text-4xl font-black uppercase tracking-tighter text-primary italic">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-2xl text-primary drop-shadow-sm">event</span>
+            <h2 className="text-lg font-black uppercase tracking-tighter text-primary italic">
               {selectedDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
               {selectedDate.toDateString() === new Date().toDateString() && " (OGGI)"}
             </h2>
@@ -521,10 +554,10 @@ export default function Home() {
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center translate-y-4">
-                <span className="text-[12rem] font-black text-[#111811] dark:text-white leading-none">{totalCalories.toLocaleString()}</span>
-                <span className="text-4xl text-[#618961] font-black uppercase tracking-widest mt-4">KCAL</span>
-                <div className="my-6 h-1.5 w-28 bg-[#dbe6db]"></div>
-                <span className="text-2xl text-[#618961] font-black italic">Target: {targetCalories.toLocaleString()}</span>
+                <span className="text-7xl font-black text-[#111811] dark:text-white leading-none">{totalCalories.toLocaleString()}</span>
+                <span className="text-xl text-[#618961] font-black uppercase tracking-widest mt-2">KCAL</span>
+                <div className="my-4 h-1 w-20 bg-[#dbe6db]"></div>
+                <span className="text-lg text-[#618961] font-black italic">Target: {targetCalories.toLocaleString()}</span>
               </div>
             </div>
             <div className="text-center pt-4">
@@ -552,8 +585,8 @@ export default function Home() {
             <div className="w-full bg-[#dbe6db] dark:bg-white/10 h-4 rounded-full mt-4 overflow-hidden">
               <div className="bg-primary h-full rounded-full transition-all duration-1000" style={{ width: `${fatPercentage}%` }}></div>
             </div>
-            <p className="text-lg text-[#618961] mt-4 font-black">{Math.round(totalFat)}g</p>
-            <p className="text-sm text-[#618961]/60 font-bold">Goal {targetFat}g</p>
+            <p className="text-lg text-[#618961] mt-2 font-black">{Math.round(totalFat)}g</p>
+            <p className="text-[10px] text-[#618961]/60 font-bold uppercase">Goal {targetFat}g</p>
           </div>
           {/* Carbs */}
           <div className="bg-white dark:bg-background-dark rounded-[2.5rem] p-6 border-2 border-[#dbe6db] dark:border-white/20 flex flex-col items-center text-center">
@@ -562,8 +595,8 @@ export default function Home() {
             <div className="w-full bg-[#dbe6db] dark:bg-white/10 h-4 rounded-full mt-4 overflow-hidden">
               <div className="bg-primary h-full rounded-full transition-all duration-1000" style={{ width: `${carbsPercentage}%` }}></div>
             </div>
-            <p className="text-lg text-[#618961] mt-4 font-black">{Math.round(totalCarbs)}g</p>
-            <p className="text-sm text-[#618961]/60 font-bold">Goal {targetCarbs}g</p>
+            <p className="text-lg text-[#618961] mt-2 font-black">{Math.round(totalCarbs)}g</p>
+            <p className="text-[10px] text-[#618961]/60 font-bold uppercase">Goal {targetCarbs}g</p>
           </div>
         </div>
 
@@ -572,23 +605,23 @@ export default function Home() {
         <div className="flex flex-col gap-10 px-4 py-12">
           <button
             onClick={() => handleSetCurrentView('add-meal')}
-            className="flex items-center justify-center gap-6 w-full h-48 rounded-[2.5rem] bg-primary text-[#111811] font-black text-7xl shadow-2xl shadow-primary/30 active:scale-95 transition-transform"
+            className="flex items-center justify-center gap-4 w-full h-24 rounded-2xl bg-primary text-[#111811] font-black text-3xl shadow-2xl shadow-primary/30 active:scale-95 transition-transform"
           >
-            <span className="material-symbols-outlined text-[7rem]">add_circle</span>
+            <span className="material-symbols-outlined text-4xl">add_circle</span>
             <span>AGGIUNGI PASTO</span>
           </button>
 
           <button
             onClick={handleHoFame}
             disabled={loadingHungry}
-            className="flex items-center justify-center gap-6 w-full h-48 rounded-[2.5rem] bg-amber-400 text-[#111811] font-black text-7xl shadow-2xl shadow-amber-400/30 active:scale-95 transition-transform disabled:opacity-50 mt-4 border-b-8 border-amber-600/30"
+            className="flex items-center justify-center gap-4 w-full h-24 rounded-2xl bg-amber-400 text-[#111811] font-black text-3xl shadow-2xl shadow-amber-400/30 active:scale-95 transition-transform disabled:opacity-50 mt-2 border-b-4 border-amber-600/30"
           >
-            <span className="material-symbols-outlined text-[7rem]">{loadingHungry ? 'hourglass_empty' : 'fastfood'}</span>
+            <span className="material-symbols-outlined text-4xl">{loadingHungry ? 'hourglass_empty' : 'fastfood'}</span>
             <span>HO FAME!</span>
           </button>
 
-          <button onClick={() => handleSetCurrentView('weight')} className="flex items-center justify-center gap-6 w-full h-48 rounded-[2.5rem] bg-white dark:bg-white/5 border-4 border-[#dbe6db] dark:border-white/10 text-[#111811] dark:text-white font-black text-7xl active:scale-95 transition-transform">
-            <span className="material-symbols-outlined text-[7rem]">trending_up</span>
+          <button onClick={() => handleSetCurrentView('weight')} className="flex items-center justify-center gap-4 w-full h-24 rounded-2xl bg-white dark:bg-white/5 border-2 border-[#dbe6db] dark:border-white/10 text-[#111811] dark:text-white font-black text-3xl active:scale-95 transition-transform">
+            <span className="material-symbols-outlined text-4xl">trending_up</span>
             <span>IL MIO PESO</span>
           </button>
         </div>
@@ -633,12 +666,12 @@ export default function Home() {
 
               {loadingCoach ? (
                 <div className="flex items-center gap-6 py-10">
-                  <div className="animate-spin size-12 border-8 border-primary border-t-transparent rounded-full"></div>
-                  <p className="text-4xl text-[#618961] italic font-black">STRIZZO IL CERVELLO...</p>
+                  <div className="animate-spin size-8 border-4 border-primary border-t-transparent rounded-full"></div>
+                  <p className="text-xl text-[#618961] italic font-black">STRIZZO IL CERVELLO...</p>
                 </div>
               ) : coachAdvice ? (
                 <div className="space-y-12">
-                  <p className="text-4xl font-black leading-tight italic text-[#111811] dark:text-white">
+                  <p className="text-xl font-black leading-tight italic text-[#111811] dark:text-white">
                     "{coachAdvice.tip}"
                   </p>
 
@@ -673,7 +706,7 @@ export default function Home() {
         {/* Recent Activity Section */}
         <div className="px-4 pb-12 mt-8">
           <div className="flex justify-between items-center mb-8">
-            <h3 className="text-[#111811] dark:text-white text-4xl font-black italic">I TUOI PASTI</h3>
+            <h3 className="text-[#111811] dark:text-white text-2xl font-black italic">I TUOI PASTI</h3>
             <button className="text-primary text-xl font-black uppercase underline decoration-4 underline-offset-8">Tutti</button>
           </div>
           <div className="space-y-6">
@@ -697,19 +730,44 @@ export default function Home() {
                     onDoubleClick={() => setEditingMeal(meal)}
                     onTouchStart={handleTouchStart}
                     onTouchEnd={handleTouchEnd}
-                    className="flex items-center gap-6 bg-white dark:bg-background-dark p-8 rounded-[3rem] border-4 border-[#dbe6db] dark:border-white/20 shadow-lg active:scale-95 transition-transform"
+                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 shadow-sm active:scale-95 transition-transform ${meal.status === 'pending' ? 'bg-primary/5 dark:bg-primary/5 border-primary/20 cursor-wait' : meal.status === 'error' ? 'bg-red-50 dark:bg-red-950/20 border-red-500/20' : 'bg-white dark:bg-background-dark border-[#dbe6db] dark:border-white/20'}`}
                   >
-                    <div className="size-20 rounded-3xl bg-primary/20 flex items-center justify-center text-primary">
-                      <span className="material-symbols-outlined text-5xl">restaurant</span>
+                    <div className={`size-12 rounded-xl flex items-center justify-center ${meal.status === 'error' ? 'bg-red-500/20 text-red-500' : 'bg-primary/20 text-primary'}`}>
+                      {meal.status === 'pending' ? (
+                        <Loader2 className="animate-spin text-2xl" />
+                      ) : meal.status === 'error' ? (
+                        <AlertTriangle className="text-2xl" />
+                      ) : (
+                        <span className="material-symbols-outlined text-2xl">restaurant</span>
+                      )}
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-2xl font-black text-[#111811] dark:text-white capitalize">{meal.name}</h4>
-                      <p className="text-xl text-[#618961] mt-2 font-bold">{meal.quantity}g</p>
+                      <h4 className={`text-2xl font-black capitalize ${meal.status === 'error' ? 'text-red-500 dark:text-red-400' : 'text-[#111811] dark:text-white'}`}>{meal.name}</h4>
+                      {meal.status === 'error' && <p className="text-sm font-bold text-red-500/70">{meal.analysis}</p>}
+                      {meal.status !== 'pending' && meal.status !== 'error' && (
+                        <p className="text-xl text-[#618961] mt-2 font-bold">{meal.quantity}g</p>
+                      )}
                     </div>
                     <div className="text-right">
-                      <p className="text-3xl font-black text-[#111811] dark:text-white">{meal.calories} kcal</p>
-                      <p className="text-lg text-[#618961] font-bold mt-1">{new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                      {meal.status === 'pending' ? (
+                        <p className="text-xl font-black text-amber-500 animate-pulse uppercase tracking-widest mt-2">Attendere...</p>
+                      ) : meal.status === 'error' ? (
+                        <p className="text-xl font-bold text-red-500 underline mt-2">Modifica</p>
+                      ) : (
+                        <>
+                          <p className="text-xl font-black text-[#111811] dark:text-white">{meal.calories} kcal</p>
+                          <p className="text-sm text-[#618961] font-bold mt-1">{new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        </>
+                      )}
                     </div>
+                    {meal.status !== 'pending' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteMeal(meal.id); }}
+                        className="size-16 ml-2 rounded-2xl bg-red-500/10 text-red-500 flex shrink-0 items-center justify-center active:scale-90 transition-all"
+                      >
+                        <Trash2 size={24} />
+                      </button>
+                    )}
                   </div>
                 );
               })
@@ -721,8 +779,8 @@ export default function Home() {
       {/* Navigation Bar (iOS Style) */}
       <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-background-dark border-t-8 border-[#13ec13]/20 px-4 py-8 pb-14 flex justify-between items-center z-20 shadow-[0_-20px_60px_rgba(0,0,0,0.15)]">
         <button onClick={() => handleSetCurrentView('dashboard')} className="flex flex-col items-center text-primary group text-center px-1">
-          <span className="material-symbols-outlined text-[6rem] transition-all group-active:scale-95" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
-          <span className="text-5xl font-black mt-2 uppercase tracking-tighter">HOME</span>
+          <span className="material-symbols-outlined text-4xl transition-all group-active:scale-95" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
+          <span className="text-xs font-black mt-1 uppercase tracking-tighter">HOME</span>
         </button>
         <button onClick={() => handleSetCurrentView('weight')} className="flex flex-col items-center text-[#618961] group text-center px-1">
           <span className="material-symbols-outlined text-[6rem] transition-all group-active:scale-95">restaurant_menu</span>
@@ -736,8 +794,8 @@ export default function Home() {
           onClick={() => router.push('/profile')}
           className="flex flex-col items-center text-[#618961] group text-center px-1"
         >
-          <span className="material-symbols-outlined text-[6rem] transition-all group-active:scale-95">account_circle</span>
-          <span className="text-5xl font-black mt-2 uppercase tracking-tighter">PROFILO</span>
+          <span className="material-symbols-outlined text-4xl transition-all group-active:scale-95">account_circle</span>
+          <span className="text-xs font-black mt-1 uppercase tracking-tighter">PROFILO</span>
         </button>
       </div>
     </div>

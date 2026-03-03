@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { Camera, Loader2, ScanBarcode, Edit2, Send, X as CloseIcon } from 'lucide-react';
-
 import BarcodeScanner from './BarcodeScanner';
-import { analyzeFoodImage, analyzeFoodText } from '@/lib/ai';
-import { addMeal } from '@/lib/firestore';
+import { analyzeFoodImage, analyzeFoodText, analyzeBarcodeProduct } from '@/lib/ai';
+import { addMeal, updateMeal } from '@/lib/firestore';
 import { getProductFromBarcode } from '@/lib/openfoodfacts';
 
-export default function CameraInput({ onMealAdded, onMealIdentified, hideButtons, defaultDate, initialMode }) {
+export default function CameraInput({ onMealAdded, onMealIdentified, onProductEvaluated, hideButtons, defaultDate, initialMode, profile }) {
     const [activeTab, setActiveTab] = useState(initialMode || 'text'); // 'text', 'camera', 'barcode'
 
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -47,7 +46,7 @@ export default function CameraInput({ onMealAdded, onMealIdentified, hideButtons
                 let width = img.width;
                 let height = img.height;
 
-                // Max dimension 1024px
+                // Max dimension restored to 1024px for much better AI accuracy
                 const MAX_SIZE = 1024;
                 if (width > height) {
                     if (width > MAX_SIZE) {
@@ -77,18 +76,45 @@ export default function CameraInput({ onMealAdded, onMealIdentified, hideButtons
     };
 
     const analyzeImage = async (base64Image) => {
+        // We will immediately return and create a pending meal
+        const finalDate = defaultDate ? new Date(defaultDate) : new Date();
+        const tempMeal = {
+            name: "Analisi AI in corso...",
+            quantity: 0,
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            status: 'pending',
+            created_at: finalDate,
+            image_path: base64Image
+        };
         setIsAnalyzing(true);
         try {
-            // Let's strip the prefix here to be safe
-            const base64Data = base64Image.split(',')[1] || base64Image;
+            const pendingDoc = await addMeal(tempMeal);
+            if (onMealAdded) onMealAdded(pendingDoc);
+            setIsAnalyzing(false); // Free UI
 
-            const data = await analyzeFoodImage(base64Data);
-            // setPendingMeal(data); // REMOVED
-            onMealIdentified(data, base64Image); // Call Parent
-            setIsAnalyzing(false);
+            // Fire and forget background promise
+            const base64Data = base64Image.split(',')[1] || base64Image;
+            setPendingImage(null); // Clear local state immediately to avoid UI blocking
+            analyzeFoodImage(base64Data, profile).then(async (data) => {
+                await updateMeal(pendingDoc.id, {
+                    ...data,
+                    status: 'completed'
+                });
+            }).catch(async (error) => {
+                console.error("AI Background Image Error:", error);
+                await updateMeal(pendingDoc.id, {
+                    name: "Errore AI - Clicca ed inserisci i dati",
+                    status: 'error',
+                    analysis: "Scusa, l'app o l'intelligenza artificiale hanno riscontrato un errore."
+                });
+            });
         } catch (error) {
-            console.error(error);
-            alert('Errore durante l\'analisi dell\'immagine. Riprova o usa l\'inserimento manuale.');
+            console.error("Firestore error saving pending image meal", error);
+            alert("Impossibile salvare il pasto iniziale, controlla la tua connessione.");
+        } finally {
             setIsAnalyzing(false);
         }
     };
@@ -97,35 +123,55 @@ export default function CameraInput({ onMealAdded, onMealIdentified, hideButtons
         if (!textDescription.trim()) return;
         setIsAnalyzing(true);
         try {
-            console.log("Analyzing text:", textDescription);
-            const data = await analyzeFoodText(textDescription, defaultDate || new Date());
-            console.log("Analysis result:", data);
+            const finalDateInput = defaultDate ? new Date(defaultDate) : new Date();
+            const desc = textDescription; // Capture it cleanly
 
-            if (!data) throw new Error("No data returned");
+            const tempMeal = {
+                name: `Analizzazione... "${desc.substring(0, 15)}..."`,
+                quantity: 0,
+                calories: 0,
+                protein: 0,
+                carbs: 0,
+                fat: 0,
+                status: 'pending',
+                created_at: finalDateInput
+            };
 
-            // Prioritize date extracted by AI (YYYY-MM-DD)
-            let finalDate = defaultDate ? new Date(defaultDate) : new Date();
-
-            if (data.date) {
-                const [y, m, d] = data.date.split('-').map(Number);
-                finalDate.setFullYear(y, m - 1, d);
-            }
-
-            // If AI extracted a time (HH:MM), prioritize it
-            if (data.time && /^\d{2}:\d{2}$/.test(data.time)) {
-                const [hours, minutes] = data.time.split(':').map(Number);
-                finalDate.setHours(hours, minutes, 0, 0);
-            }
-
-            // setPendingMeal({...}); // REMOVED
-            onMealIdentified({
-                ...data,
-                date: finalDate
-            }, null); // Call Parent, no image for text
-
+            const pendingDoc = await addMeal(tempMeal);
+            if (onMealAdded) onMealAdded(pendingDoc);
             setTextDescription("");
+            setIsAnalyzing(false); // Free UI
+
+            // Fire and forget background promise
+            analyzeFoodText(desc, finalDateInput, profile).then(async (data) => {
+                let finalDate = finalDateInput;
+                if (data.date) {
+                    const [y, m, d] = data.date.split('-').map(Number);
+                    finalDate = new Date(finalDate);
+                    finalDate.setFullYear(y, m - 1, d);
+                }
+                if (data.time && /^\d{2}:\d{2}$/.test(data.time)) {
+                    finalDate = new Date(finalDate);
+                    const [hours, minutes] = data.time.split(':').map(Number);
+                    finalDate.setHours(hours, minutes, 0, 0);
+                }
+
+                await updateMeal(pendingDoc.id, {
+                    ...data,
+                    created_at: finalDate,
+                    status: 'completed'
+                });
+            }).catch(async (error) => {
+                console.error("AI Background Text Error:", error);
+                await updateMeal(pendingDoc.id, {
+                    name: "Errore elaborazione AI Testo",
+                    status: 'error',
+                    analysis: error.message || "L'Intelligenza Artificiale non è riuscita a capire questo testo."
+                });
+            });
+
         } catch (error) {
-            console.error("Text analysis failed:", error);
+            console.error("Failed handling text submit:", error);
             alert(`Errore AI: ${error.message || 'Riprova con una descrizione più semplice'}`);
         } finally {
             setIsAnalyzing(false);
@@ -134,11 +180,24 @@ export default function CameraInput({ onMealAdded, onMealIdentified, hideButtons
 
     const handleBarcodeDetected = async (code) => {
         setIsScanning(false);
+        setActiveTab(''); // Force scanner UI to disappear immediately
         setIsAnalyzing(true);
         try {
             const data = await getProductFromBarcode(code);
-            // setPendingMeal(data); // REMOVED
-            onMealIdentified(data, null); // Call Parent
+            // Enrich with AI analysis
+            try {
+                const aiAnalysis = await analyzeBarcodeProduct(data, profile);
+                data.analysis = aiAnalysis;
+            } catch (aiError) {
+                console.error("AI Barcode Analysis fallback:", aiError);
+                data.analysis = `⚠️ L'Intelligenza Artificiale è attualmente intasata da troppe richieste simultanee o in pausa tecnica. \n\nI dati del prodotto (calorie, macronutrienti) sono comunque stati recuperati con successo dal database e visualizzati qui sopra. Riprova la scansione dell'etichetta tra qualche minuto per ricevere anche il parere qualitativo del nutrizionista virtuale.`;
+            }
+
+            if (onProductEvaluated) {
+                onProductEvaluated(data);
+            } else {
+                onMealIdentified(data, null); // Fallback
+            }
         } catch (error) {
             console.error(error);
             alert("Prodotto non trovato o errore di scansione.");

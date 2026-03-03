@@ -1,37 +1,28 @@
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
 
-const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const fs = require("fs");
+const path = require("path");
 
-async function listAvailableModels() {
-    const versions = ['v1beta', 'v1'];
+const envPath = path.resolve(__dirname, "..", ".env.local");
+const envContent = fs.readFileSync(envPath, "utf8");
+const apiKeyMatch = envContent.match(/NEXT_PUBLIC_GEMINI_API_KEY=(.*)/);
+const apiKey = apiKeyMatch ? apiKeyMatch[1].trim().replace(/^"|"$/g, '') : null;
 
-    console.log("Fetching available models from Google API...\n");
+const genAI = new GoogleGenerativeAI(apiKey);
 
-    for (const version of versions) {
-        const url = `https://generativelanguage.googleapis.com/${version}/models?key=${API_KEY}`;
+async function listModels() {
+    const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-flash-latest", "gemini-1.5-flash-8b"];
 
+    for (const modelName of models) {
         try {
-            console.log(`Checking API version: ${version}`);
-            const response = await fetch(url);
-            const data = await response.json();
-
-            if (response.ok && data.models) {
-                console.log(`\n✓ Available models in ${version}:`);
-                data.models.forEach(model => {
-                    const supportsGenerate = model.supportedGenerationMethods?.includes('generateContent');
-                    if (supportsGenerate) {
-                        console.log(`  - ${model.name} (${model.displayName})`);
-                    }
-                });
-                console.log();
-            } else {
-                console.log(`✗ Error: ${data.error?.message || 'Unknown error'}\n`);
-            }
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent("Hi");
+            const response = await result.response;
+            console.log(`OK: ${modelName}`);
         } catch (error) {
-            console.log(`✗ Fetch error: ${error.message}\n`);
+            console.log(`FAIL: ${modelName} - ${error.message.substring(0, 50)}...`);
         }
     }
 }
 
-listAvailableModels();
+listModels();

@@ -69,7 +69,7 @@ export default function NutrientRings({
                             <div>
                                 <div
                                     className="font-black tabular-nums leading-none mb-1"
-                                    style={{ fontSize: '2.25rem', color: ring.color }} // 36px, colored number
+                                    style={{ fontSize: '1.5rem', color: ring.color }} // 24px, colored number
                                 >
                                     {Math.round(ring.value)}
                                     <span style={{ fontSize: '1rem', color: '#94a3b8', marginLeft: '2px' }}>

@@ -8,13 +8,14 @@ const envPath = path.resolve(__dirname, "..", ".env.local");
 const envContent = fs.readFileSync(envPath, "utf8");
 const apiKeyMatch = envContent.match(/NEXT_PUBLIC_GEMINI_API_KEY=(.*)/);
 const apiKey = apiKeyMatch ? apiKeyMatch[1].trim().replace(/^"|"$/g, '') : null;
+process.env.NEXT_PUBLIC_GEMINI_API_KEY = apiKey;
 
 const genAI = new GoogleGenerativeAI(apiKey);
 
 async function test(description) {
     console.log(`\n--- Testing: "${description}" ---`);
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const prompt = `
         Analizza questa descrizione di cibo: "${description}"

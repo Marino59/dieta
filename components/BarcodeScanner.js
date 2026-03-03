@@ -46,17 +46,14 @@ export default function BarcodeScanner({ onDetected, onClose }) {
     }, []);
 
     return (
-        <div className="fixed inset-0 z-[60] bg-black text-white flex flex-col">
-            <div className="flex justify-between items-center p-4">
-                <h3 className="font-bold text-lg">Scan Barcode</h3>
-                <button onClick={onClose} className="p-2 bg-gray-800 rounded-full">
-                    <X size={24} />
+        <div className="w-full h-full relative flex flex-col items-center justify-center bg-black rounded-[4rem] overflow-hidden">
+            <div className="absolute top-4 right-4 z-[70]">
+                <button onClick={onClose} className="p-3 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full text-white transition-all active:scale-95 shadow-lg">
+                    <X size={28} />
                 </button>
             </div>
-            <div id="reader" className="w-full flex-1"></div>
-            <p className="p-4 text-center text-sm text-gray-400">
-                Point camera at a barcode to scan.
-            </p>
+            {/* The scanner renders its own UI inside this div. Setting min-height ensures it doesn't collapse before init */}
+            <div id="reader" className="w-full min-h-[300px] flex items-center justify-center"></div>
         </div>
     );
 }
