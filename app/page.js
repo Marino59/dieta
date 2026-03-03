@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { Trash2, TrendingUp, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity, Loader2, AlertTriangle } from 'lucide-react';
+import { Trash2, TrendingUp, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity, Loader2, AlertTriangle, User } from 'lucide-react';
 import { getMeals, deleteMeal, updateMeal, addMeal, getUserProfile, getWeights, addWeight, deleteWeight, subscribeToMeals } from '@/lib/firestore';
 import { getDailyCoachAdvice, getHungryAdvice } from "@/lib/ai";
 import ConfirmMealModal from '@/components/ConfirmMealModal';
