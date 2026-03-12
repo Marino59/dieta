@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, cloneElement } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Trash2, TrendingUp, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity, Loader2, AlertTriangle, User } from 'lucide-react';
 import { getMeals, deleteMeal, updateMeal, addMeal, getUserProfile, getWeights, addWeight, deleteWeight, subscribeToMeals } from '@/lib/firestore';
 import { getDailyCoachAdvice, getHungryAdvice, parseWeightGoal } from "@/lib/ai";
@@ -10,18 +10,16 @@ import ConfirmMealModal from '@/components/ConfirmMealModal';
 import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine,
-  Cell,
-  Scatter,
-  ZAxis
+  CartesianGrid,
+  Scatter
 } from 'recharts';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -34,6 +32,7 @@ export default function Home() {
   const user = authContext?.user;
   const authLoading = authContext?.loading ?? true;
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [currentView, setCurrentView] = useState('dashboard');
   const [pendingMealData, setPendingMealData] = useState(null);
@@ -42,10 +41,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [editingMeal, setEditingMeal] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [inputMode, setInputMode] = useState(null); // 'camera', 'text', 'barcode'
+  const [inputMode, setInputMode] = useState(null);
   const [coachAdvice, setCoachAdvice] = useState(null);
   const [loadingCoach, setLoadingCoach] = useState(false);
-  const [showRecipe, setShowRecipe] = useState(false);
   const [weights, setWeights] = useState([]);
   const [isAddingWeight, setIsAddingWeight] = useState(false);
   const [newWeightValue, setNewWeightValue] = useState("");
@@ -57,14 +55,10 @@ export default function Home() {
   const [chartReady, setChartReady] = useState(false);
   const [chartWidth, setChartWidth] = useState(0);
   const [weightPeriod, setWeightPeriod] = useState('SETT');
-  const [parsedGoal, setParsedGoal] = useState(null);
   const chartContainerRef = useRef(null);
   const dateInputRef = useRef(null);
-
-  const handleSetCurrentView = (view) => {
-    setCurrentView(view);
-    setInputMode(null);
-  };
+  const [swipeDirection, setSwipeDirection] = useState(0);
+  const [weightViewReady, setWeightViewReady] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -77,384 +71,166 @@ export default function Home() {
       }
     };
     window.addEventListener('resize', handleResize);
+    handleResize();
     return () => window.removeEventListener('resize', handleResize);
-  }, [currentView]);
+  }, [currentView, chartReady]);
 
   useEffect(() => {
-    if (currentView === 'weight') {
-      const timer = setTimeout(() => {
-        if (chartContainerRef.current) {
-          const width = chartContainerRef.current.offsetWidth;
-          setChartWidth(width || 300); // Fallback to 300 if measurement fails
-        }
-        setChartReady(true);
-      }, 800); // Increased delay
-      return () => {
-        clearTimeout(timer);
-        setChartReady(false);
-      };
-    } else {
-      setChartReady(false);
+    const view = searchParams.get('view');
+    const action = searchParams.get('action');
+
+    if (view === 'weight' && currentView !== 'weight') {
+      setSwipeDirection(1);
+      setCurrentView('weight');
+    } else if (action === 'ho-fame' && currentView !== 'hungry') {
+      setCurrentView('hungry');
+    } else if (!view && !action && (currentView === 'weight' || currentView === 'hungry')) {
+      if (currentView === 'weight') setSwipeDirection(-1);
+      setCurrentView('dashboard');
     }
-  }, [currentView]);
+  }, [searchParams]);
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/login');
-  }, [user, authLoading, router]);
+    if (!user) return;
+    setLoading(true);
+    getUserProfile(user.uid).then(p => {
+      setProfile(p);
+      if (p) {
+        getWeights(user.uid).then(w => {
+          setWeights(w);
+          setChartReady(true);
+        });
+      }
+    });
 
-  useEffect(() => {
-    if (user) {
-      let unsubscribe = () => { };
+    const unsubscribe = subscribeToMeals(selectedDate, (updatedMeals) => {
+      setMeals(updatedMeals);
+      setLoading(false);
+    });
 
-      const loadInitialData = async () => {
-        setLoading(true);
-        try {
-          const [profileData, weightsData] = await Promise.all([
-            getUserProfile(),
-            getWeights()
-          ]);
-          setProfile(profileData);
-          setWeights(weightsData);
+    getWeights(user.uid).then(setWeights);
 
-          let initialCoachFetched = false;
-
-          unsubscribe = subscribeToMeals(selectedDate, (mealsData) => {
-            setMeals(mealsData);
-            setLoading(false);
-          });
-        } catch (error) {
-          console.error("Failed loading initial data", error);
-          setLoading(false);
-        }
-      };
-
-      loadInitialData();
-      return () => unsubscribe();
-    }
+    return () => unsubscribe();
   }, [user, selectedDate]);
 
-  // Dedicated effect for AI Coach Advice to ensure it refreshes correctly
   useEffect(() => {
-    if (!user || !profile?.goalDescription || loading) return;
-
-    const today = new Date().toISOString().split('T')[0];
-    const totalCals = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
-    const cacheKey = `coachAdvice_${user.uid}_${today}_m${meals.length}_c${totalCals}_w${weights.length}`;
-
-    // Check cache and timestamp for "cooldown"
-    const cachedData = localStorage.getItem('coachAdviceCache');
-    const now = Date.now();
-    const FIFTEEN_MINUTES = 15 * 60 * 1000;
-
-    if (cachedData) {
-      const { advice, key, timestamp } = JSON.parse(cachedData);
-
-      // If the key is the same, use it
-      if (key === cacheKey) {
-        setCoachAdvice(advice);
-        setLoadingCoach(false);
-        return;
-      }
-
-      // If the key is different (something changed), but we fetched recently (< 15 min),
-      // we DON'T re-fetch automatically to save quota. The user will see the slightly outdated advice
-      // until the cooldown expires or they do something major.
-      if (timestamp && (now - timestamp) < FIFTEEN_MINUTES) {
-        setCoachAdvice(advice);
-        setLoadingCoach(false);
-        return;
-      }
+    if (profile?.coachAdvice) {
+      setCoachAdvice(profile.coachAdvice);
     }
+  }, [profile]);
 
-    setLoadingCoach(true);
+  const handleSetCurrentView = (view) => {
+    setCurrentView(view);
+    setInputMode(null);
+  };
 
-    getDailyCoachAdvice(profile, meals, weights)
-      .then(advice => {
-        if (advice) {
-          setCoachAdvice(advice);
-          localStorage.setItem('coachAdviceCache', JSON.stringify({
-            advice,
-            key: cacheKey,
-            timestamp: Date.now()
-          }));
-        }
-      })
-      .catch(err => console.error("Coach fetch error:", err))
-      .finally(() => setLoadingCoach(false));
-
-  }, [user, profile, meals.length, weights.length, loading, meals.reduce((s, m) => s + (m.calories || 0), 0)]);
-
-  // Effect to parse weight goal from AI description
-  useEffect(() => {
-    if (!profile?.goalDescription) {
-      setParsedGoal(null);
-      return;
-    }
-
-    const parseGoal = async () => {
-      const cacheKey = `parsedGoal_${profile.goalDescription}`;
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        setParsedGoal(JSON.parse(cached));
-        return;
-      }
-
-      try {
-        const result = await parseWeightGoal(profile.goalDescription);
-        if (result && result.targetWeight && result.targetDays) {
-          localStorage.setItem(cacheKey, JSON.stringify(result));
-          setParsedGoal(result);
-        }
-      } catch (err) {
-        console.error("Failed to parse AI goal", err);
-      }
-    };
-
-    parseGoal();
-  }, [profile?.goalDescription]);
-
-  const handleSaveNewMeal = async (confirmedData) => {
+  const handleHoFame = async () => {
+    if (!user || !profile) return;
+    setLoadingHungry(true);
+    setCurrentView('hungry');
     try {
-      setLoading(true);
-      const safeNumber = (val) => {
-        const num = parseFloat(val);
-        return isNaN(num) ? 0 : Math.round(num);
-      };
+      const advice = await getHungryAdvice(profile, meals);
+      setHungryAdvice(advice);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoadingHungry(false);
+    }
+  };
 
-      const mealData = {
-        name: confirmedData.name || "Pasto sconosciuto",
-        quantity: safeNumber(confirmedData.quantity) || 100,
-        calories: safeNumber(confirmedData.calories),
-        protein: safeNumber(confirmedData.protein),
-        carbs: safeNumber(confirmedData.carbs),
-        fat: safeNumber(confirmedData.fat),
-        analysis: confirmedData.analysis || "",
-        created_at: confirmedData.date ? confirmedData.date : new Date()
-      };
-
+  const handleSaveNewMeal = async (mealData) => {
+    setLoading(true);
+    try {
       if (editingMeal) {
         await updateMeal(editingMeal.id, mealData);
-        setEditingMeal(null);
       } else {
-        const mealToSave = {
-          ...mealData,
-          image_path: pendingMealData?.image_path || null,
-        };
-        await addMeal(mealToSave);
+        await addMeal(mealData);
       }
-
       setPendingMealData(null);
-      handleSetCurrentView('dashboard');
-    } catch (error) {
-      console.error("Error saving meal:", error);
-      alert(`Errore salvataggio: ${error.message}`);
+      setEditingMeal(null);
+      setCurrentView('dashboard');
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMealIdentified = (data, imageBase64) => {
-    setPendingMealData({ ...data, image_path: imageBase64 });
-    handleSetCurrentView('confirm-meal');
-  };
-
-  const handleProductEvaluated = (data) => {
-    setPendingMealData(data);
-    handleSetCurrentView('eval-product');
+  const handleDeleteMeal = async (id) => {
+    if (confirm('Eliminare questo pasto?')) {
+      await deleteMeal(id);
+    }
   };
 
   const handleAddWeight = async () => {
-    if (!newWeightValue || isNaN(parseFloat(newWeightValue))) return;
+    if (!user || !newWeightValue) {
+      console.log("Add weight aborted: user or value missing", { user: !!user, value: newWeightValue });
+      return;
+    }
+    console.log("Saving weight:", newWeightValue);
+    setLoading(true);
     try {
-      setLoading(true);
-      const [year, month, day] = weightDate.split('-').map(Number);
-      const [hours, minutes] = weightTime.split(':').map(Number);
-      const finalDate = new Date(year, month - 1, day, hours, minutes);
+      const sanitizedWeight = parseFloat(newWeightValue.toString().replace(',', '.'));
+      console.log("Sanitized weight:", sanitizedWeight);
+      const timestamp = new Date(`${weightDate}T${weightTime}`);
+      await addWeight({ weight: sanitizedWeight, created_at: timestamp.toISOString() });
+      const updatedWeights = await getWeights();
+      setWeights(updatedWeights);
 
-      const weightEntry = {
-        weight: parseFloat(newWeightValue),
-        created_at: finalDate
-      };
-      const newEntry = await addWeight(weightEntry);
-      setWeights(prev => [...prev, newEntry].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
-      setNewWeightValue("");
+      // Refresh AI Coach Advice only on new weight
+      setLoadingCoach(true);
+      try {
+        const advice = await getDailyCoachAdvice(profile, meals, updatedWeights);
+        setCoachAdvice(advice);
+        // Persist advice in profile
+        const { saveUserProfile } = await import('@/lib/firestore');
+        await saveUserProfile({ ...profile, coachAdvice: advice });
+      } catch (err) {
+        console.error("Coach refresh failed", err);
+      } finally {
+        setLoadingCoach(false);
+      }
+
       setIsAddingWeight(false);
-    } catch (error) {
-      console.error("Error adding weight:", error);
-      alert("Errore salvataggio peso");
+      setNewWeightValue("");
+      console.log("Weight saved successfully");
+    } catch (e) {
+      console.error("Error saving weight:", e);
+      alert("Errore nel salvataggio del peso. Riprova.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteWeight = async (id) => {
-    if (!confirm("Eliminare questa pesata?")) return;
-    try {
+    if (confirm('Eliminare questa pesata?')) {
       await deleteWeight(id);
-      setWeights(prev => prev.filter(w => w.id !== id));
-    } catch (error) {
-      console.error("Error deleting weight:", error);
+      const updatedWeights = await getWeights(user.uid);
+      setWeights(updatedWeights);
     }
   };
 
-  const handleDeleteMeal = async (id) => {
-    if (!confirm("Eliminare questo pasto?")) return;
-    try {
-      await deleteMeal(id);
-    } catch (error) {
-      console.error("Error deleting meal:", error);
+  const handleMealIdentified = (data) => {
+    setPendingMealData(data);
+    setCurrentView('confirm-meal');
+  };
+
+  const handleProductEvaluated = (data) => {
+    setPendingMealData(data);
+    setCurrentView('eval-product');
+  };
+
+  const handleSwipe = (direction) => {
+    if (direction === 'left' && currentView === 'dashboard') {
+      setSwipeDirection(1);
+      router.push('/?view=weight');
+    } else if (direction === 'right' && currentView === 'weight') {
+      setSwipeDirection(-1);
+      router.push('/');
     }
   };
 
-  // Weight Monitoring Logic
-  const sortedWeights = [...weights].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  const currentWeight = sortedWeights.length > 0 ? sortedWeights[sortedWeights.length - 1].weight : 0;
-  const initialWeight = sortedWeights.length > 0 ? sortedWeights[0].weight : 0;
-  const targetWeight = profile?.targetWeight || 0;
-
-  const weightLost = initialWeight > 0 ? (initialWeight - currentWeight).toFixed(1) : 0;
-  const weightMissing = currentWeight > targetWeight ? (currentWeight - targetWeight).toFixed(1) : 0;
-
-  // Calculate Weekly Delta
-  const getWeeklyDelta = () => {
-    if (sortedWeights.length < 2) return 0;
-    const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-
-    const thisWeekWeights = sortedWeights.filter(w => new Date(w.created_at) >= oneWeekAgo);
-    const lastWeekWeights = sortedWeights.filter(w => new Date(w.created_at) >= twoWeeksAgo && new Date(w.created_at) < oneWeekAgo);
-
-    if (thisWeekWeights.length === 0 || lastWeekWeights.length === 0) {
-      // Fallback: compare latest to previous
-      return (currentWeight - sortedWeights[sortedWeights.length - 2].weight).toFixed(1);
-    }
-
-    const avgThisWeek = thisWeekWeights.reduce((sum, w) => sum + w.weight, 0) / thisWeekWeights.length;
-    const avgLastWeek = lastWeekWeights.reduce((sum, w) => sum + w.weight, 0) / lastWeekWeights.length;
-
-    return (avgThisWeek - avgLastWeek).toFixed(1);
-  };
-
-  const weeklyDelta = getWeeklyDelta();
-
-  // Prepare Chart Data (Dynamic Period)
-  const chartData = (() => {
-    const result = [];
-    const now = new Date();
-
-    // Helper for linear target calculation
-    const getLinearTarget = (date) => {
-      if (!parsedGoal || !parsedGoal.targetWeight || !parsedGoal.targetDays || sortedWeights.length < 1) return null;
-
-      // Use the earliest available weight as start weight
-      const startWeightEntry = sortedWeights[0];
-      const startWeight = startWeightEntry.weight;
-      const startDate = new Date(startWeightEntry.created_at);
-
-      const daysPassed = Math.max(0, (date - startDate) / (1000 * 60 * 60 * 24));
-
-      // Slope: (targetWeight - startWeight) / totalDays
-      const dailyChange = (parsedGoal.targetWeight - startWeight) / parsedGoal.targetDays;
-
-      // Linear regression
-      const calculatedTarget = startWeight + (dailyChange * daysPassed);
-
-      // Final goal shouldn't go below targetWeight (or above if gaining)
-      const isLosing = parsedGoal.targetWeight < startWeight;
-      if (isLosing) {
-        return Math.max(parsedGoal.targetWeight, calculatedTarget);
-      } else {
-        return Math.min(parsedGoal.targetWeight, calculatedTarget);
-      }
-    };
-
-    if (weightPeriod === 'SETT') {
-      const days = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB'];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dayLabel = days[d.getDay()];
-        const dayWeights = weights.filter(w => new Date(w.created_at).toDateString() === d.toDateString());
-        const weight = dayWeights.length > 0 ? dayWeights[dayWeights.length - 1].weight : 0;
-        result.push({
-          day: dayLabel,
-          weight,
-          target: getLinearTarget(d),
-          isCurrent: i === 0
-        });
-      }
-    } else if (weightPeriod === 'MESE') {
-      // Group last 28 days into 4 weeks
-      for (let i = 3; i >= 0; i--) {
-        const start = new Date(now);
-        start.setDate(now.getDate() - (i + 1) * 7);
-        const end = new Date(now);
-        end.setDate(now.getDate() - i * 7);
-
-        const weekWeights = weights.filter(w => {
-          const date = new Date(w.created_at);
-          return date >= start && date < end;
-        });
-
-        const avg = weekWeights.length > 0
-          ? weekWeights.reduce((sum, w) => sum + w.weight, 0) / weekWeights.length
-          : 0;
-
-        result.push({
-          day: i === 0 ? 'ORA' : `-${i} SETT`,
-          weight: Number(avg.toFixed(1)),
-          target: getLinearTarget(end),
-          isCurrent: i === 0
-        });
-      }
-    } else if (weightPeriod === 'ANNO') {
-      const monthNames = ['GEN', 'FEB', 'MAR', 'APR', 'MAG', 'GIU', 'LUGL', 'AGO', 'SET', 'OTT', 'NOV', 'DIC'];
-      for (let i = 11; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthStr = monthNames[d.getMonth()];
-
-        const weightsInMonth = weights.filter(w => {
-          const wd = new Date(w.created_at);
-          return wd.getMonth() === d.getMonth() && wd.getFullYear() === d.getFullYear();
-        });
-
-        const avg = weightsInMonth.length > 0
-          ? weightsInMonth.reduce((sum, w) => sum + w.weight, 0) / weightsInMonth.length
-          : 0;
-
-        result.push({
-          day: monthStr,
-          weight: Number(avg.toFixed(1)),
-          target: getLinearTarget(new Date(d.getFullYear(), d.getMonth() + 1, 0)),
-          isCurrent: i === 0
-        });
-      }
-    }
-    return result;
-  })();
-
-  const handleHoFame = async () => {
-    try {
-      setLoadingHungry(true);
-      setHungryAdvice(null);
-      const advice = await getHungryAdvice(profile, totalCalories);
-      setHungryAdvice(advice);
-    } catch (error) {
-      console.error("Ho Fame error:", error);
-    } finally {
-      setLoadingHungry(false);
-    }
-  };
-
-  if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
+  // Calculations
   const totalCalories = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
   const totalProtein = meals.reduce((sum, m) => sum + (m.protein || 0), 0);
   const totalCarbs = meals.reduce((sum, m) => sum + (m.carbs || 0), 0);
@@ -464,17 +240,89 @@ export default function Home() {
   const targetProtein = profile?.targetProtein || 150;
   const targetCarbs = profile?.targetCarbs || 300;
   const targetFat = profile?.targetFat || 70;
+  const targetWeight = profile?.targetWeight || 0;
 
   const proteinPercentage = Math.min((totalProtein / targetProtein) * 100, 100);
   const fatPercentage = Math.min((totalFat / targetFat) * 100, 100);
   const carbsPercentage = Math.min((totalCarbs / targetCarbs) * 100, 100);
 
-  // SVG Circle calculations
   const radius = 135;
   const circumference = 2 * Math.PI * radius;
   const dashPercentage = Math.min((totalCalories / targetCalories) * circumference, circumference);
   const strokeDashoffset = circumference - dashPercentage;
 
+  // Weight Data Processing
+  const getWeightTime = (w) => w.created_at ? new Date(w.created_at).getTime() : w.timestamp;
+  const sortedWeights = [...weights].sort((a, b) => getWeightTime(a) - getWeightTime(b));
+  const currentWeight = sortedWeights.length > 0 ? sortedWeights[sortedWeights.length - 1].weight : 0;
+  const initialWeight = sortedWeights.length > 0 ? sortedWeights[0].weight : 0;
+  const weightLost = initialWeight > 0 ? (initialWeight - currentWeight).toFixed(1) : 0;
+  const weightMissing = targetWeight > 0 ? (currentWeight - targetWeight).toFixed(1) : 0;
+
+  const getWeeklyDelta = () => {
+    if (sortedWeights.length < 2) return 0;
+    const now = Date.now();
+    const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const weightsThisWeek = sortedWeights.filter(w => getWeightTime(w) >= oneWeekAgo);
+    if (weightsThisWeek.length < 2) return 0;
+    return (weightsThisWeek[weightsThisWeek.length - 1].weight - weightsThisWeek[0].weight).toFixed(1);
+  };
+  const weeklyDelta = getWeeklyDelta();
+
+  const filterWeightsByPeriod = () => {
+    const now = new Date();
+    let startDate = new Date();
+    if (weightPeriod === 'GIOR') startDate.setDate(now.getDate() - 1);
+    else if (weightPeriod === 'SETT') startDate.setDate(now.getDate() - 7);
+    else if (weightPeriod === 'ANNO') startDate.setFullYear(now.getFullYear() - 1);
+    else startDate.setDate(now.getDate() - 7); // Default to week
+
+    const filtered = sortedWeights.filter(w => new Date(getWeightTime(w)) >= startDate);
+    console.log("Filtered weights for period", weightPeriod, filtered.length);
+    return filtered;
+  };
+
+  const chartData = filterWeightsByPeriod().map(w => ({
+    day: new Date(getWeightTime(w)).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }),
+    weight: w.weight,
+    target: targetWeight > 0 ? targetWeight : null,
+    isCurrent: w.id === sortedWeights[sortedWeights.length - 1]?.id
+  }));
+
+  const maxWeight = Math.max(...chartData.map(d => d.weight), targetWeight) || 100;
+
+  const pageVariants = {
+    initial: (direction) => ({
+      x: direction > 0 ? '100%' : direction < 0 ? '-100%' : 0,
+      opacity: 0
+    }),
+    animate: {
+      x: 0,
+      opacity: 1,
+      transition: {
+        x: { type: "spring", stiffness: 200, damping: 25 },
+        opacity: { duration: 0.3 }
+      }
+    },
+    exit: (direction) => ({
+      x: direction < 0 ? '100%' : direction > 0 ? '-100%' : 0,
+      opacity: 0,
+      transition: {
+        x: { type: "spring", stiffness: 200, damping: 25 },
+        opacity: { duration: 0.3 }
+      }
+    })
+  };
+
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center">
+        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Modals (outside AnimatePresence for simplicity)
   if ((currentView === 'confirm-meal' && pendingMealData) || editingMeal) {
     return (
       <ConfirmMealModal
@@ -499,623 +347,511 @@ export default function Home() {
           setPendingMealData(null);
           handleSetCurrentView('add-meal');
         }}
+        onConfirm={handleSaveNewMeal}
       />
     );
   }
 
-  if (currentView === 'add-meal') {
-    return (
-      <div className="min-h-screen bg-background-light dark:bg-background-dark pb-24 px-4 pt-8 animate-in fade-in duration-500">
-        <div className="flex items-center justify-between mb-10">
-          <button
-            onClick={() => {
-              setCurrentView('dashboard');
-              setInputMode(null);
-            }}
-            className="flex items-center gap-4 text-[#111811] font-black text-4xl active:scale-90 transition-transform bg-primary/10 px-8 py-4 rounded-[2rem]"
-          >
-            <span className="material-symbols-outlined text-4xl">arrow_back</span>
-            INDIETRO
-          </button>
-          <span className="text-xl font-black text-primary/50 uppercase italic tracking-tighter">AGGIUNGI PASTO</span>
-        </div>
-        <CameraInput
-          onMealAdded={() => {
-            handleSetCurrentView('dashboard');
-            setInputMode(null);
-          }}
-          onMealIdentified={handleMealIdentified}
-          onProductEvaluated={handleProductEvaluated}
-          defaultDate={selectedDate}
-          initialMode={inputMode}
-          profile={profile}
-        />
-      </div>
-    );
-  }
-
-  if (currentView === 'weight') {
-    return (
-      <div className="min-h-screen bg-[#050a05] text-white font-sans pb-32 flex flex-col antialiased">
-        {/* Header */}
-        <header className="flex items-center justify-between px-6 py-8 sticky top-0 bg-[#050a05]/80 backdrop-blur-md z-30">
-          <button
-            onClick={() => handleSetCurrentView('dashboard')}
-            className="p-4 hover:bg-white/5 rounded-full transition-colors"
-          >
-            <ChevronLeft size={32} />
-          </button>
-          <h1 className="text-3xl font-black italic uppercase tracking-tighter">Monitoraggio Peso</h1>
-          <div className="w-12" />
-        </header>
-
-        <main className="flex-1 px-4 space-y-10 max-w-4xl mx-auto w-full py-4">
-          {/* Current Weight Card */}
+  return (
+    <div className="min-h-screen bg-background-light dark:bg-[#050a05] font-sans pb-12 transition-colors duration-500 overflow-x-hidden">
+      <AnimatePresence mode="wait" custom={swipeDirection}>
+        {currentView === 'dashboard' && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-[#0a150a] border-2 border-white/5 rounded-[3rem] p-10 text-center shadow-2xl"
+            key="dashboard"
+            custom={swipeDirection}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            drag="x"
+            dragDirectionLock
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.2}
+            onDragEnd={(e, { offset }) => {
+              if (offset.x < -50) handleSwipe('left');
+            }}
+            className="w-full flex flex-col"
           >
-            <p className="text-white/50 text-base font-black uppercase tracking-[0.2em] mb-4">Peso Attuale</p>
-            <div className="flex items-baseline justify-center gap-2">
-              <span className="text-8xl font-black text-[#22c55e] italic">{currentWeight || "--.-"}</span>
-              <span className="text-3xl font-bold text-[#22c55e]/70">kg</span>
-            </div>
-            <div className={cn("mt-6 flex items-center justify-center gap-2", weeklyDelta <= 0 ? "text-[#22c55e]" : "text-red-500")}>
-              <TrendingUp className={cn("size-6", weeklyDelta > 0 && "rotate-180")} />
-              <span className="text-xl font-black italic">{weeklyDelta > 0 ? "+" : ""}{weeklyDelta} kg questa settimana</span>
-            </div>
-          </motion.div>
-
-          {/* Update Progress CTA */}
-          <div className="bg-[#121c12] rounded-[2.5rem] p-8 flex items-center justify-between border-2 border-white/5 shadow-xl">
-            <div>
-              <h3 className="text-2xl font-black text-white italic uppercase tracking-tight">Aggiorna progresso</h3>
-              <p className="text-white/40 text-lg font-bold">Inserisci il peso di oggi</p>
-            </div>
-            <button
-              onClick={() => setIsAddingWeight(true)}
-              className="bg-[#22c55e] hover:bg-[#1eb054] text-[#050a05] font-black px-8 py-5 rounded-[1.5rem] transition-all active:scale-95 shadow-[0_15px_30px_rgba(34,197,94,0.3)] text-xl uppercase italic"
-            >
-              Inserisci
-            </button>
-          </div>
-
-          {/* Add Weight Modal/Overlay */}
-          {isAddingWeight && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050a05]/95 backdrop-blur-xl">
-              <div className="w-full max-w-3xl bg-[#0a150a] border-4 border-primary/20 rounded-[4rem] p-12 shadow-4xl">
-                <div className="flex items-center justify-between mb-12">
-                  <h2 className="text-4xl font-black italic uppercase tracking-tighter text-white">Nuova Pesata</h2>
-                  <button onClick={() => setIsAddingWeight(false)} className="size-16 rounded-full bg-white/5 flex items-center justify-center">
-                    <Plus className="rotate-45 size-10" />
-                  </button>
-                </div>
-                <div className="space-y-12">
-                  <div className="relative">
+            <div className="w-full max-w-none mx-auto">
+              <div className="sticky top-1 z-20 bg-background-light/80 dark:bg-[#050a05]/80 backdrop-blur-xl border-b border-primary/10 px-6 py-6 transition-all">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="size-32 rounded-[2rem] bg-primary/20 flex items-center justify-center border-4 border-primary/30 overflow-hidden shadow-2xl shadow-primary/20 active:scale-95 transition-transform" onClick={() => router.push('/profile')}>
+                    <div
+                      className="w-full h-full bg-cover bg-center"
+                      style={{
+                        backgroundImage: user?.photoURL ? `url("${user.photoURL}")` : `url("https://lh3.googleusercontent.com/aida-public/AB6AXuBFAmglX_uCu_WV-qOLzoOA-CE_0bUcHzS1_PfOGohbq1vTiE0UrReWotFOAHEkz7FuVQwWJj1YvWUPZTywZaUe87zzgy4JFmR334tzQv7wsF6WTJd_AqR5-SKgjSK2u9ySnFoxPFkP30UMBB4MpHzE6QIeZ9-9ZAxV2AWmwQ_IFtcEY8rKNFB_9_H0QKu4rxqax1AqfAgpKdPy74cfTk7n-s-A27LL0c4_3SdORyyFUXTDwqCelSV3dO1pTwmNSnvxc7TMRYUA1A")`
+                      }}
+                    ></div>
+                  </div>
+                  <h1 className="text-[#111811] dark:text-white text-9xl font-black leading-tight tracking-tighter flex-1 text-center italic drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">DIETA</h1>
+                  <div className="flex w-32 items-center justify-end relative">
                     <input
-                      type="number"
-                      inputMode="decimal"
-                      step="0.1"
-                      autoFocus
-                      value={newWeightValue}
-                      onChange={(e) => setNewWeightValue(e.target.value)}
-                      placeholder="00.0"
-                      className="w-full text-[10rem] font-black bg-transparent text-center border-b-8 border-primary/20 focus:border-primary outline-none py-4 text-white transition-all placeholder:text-white/10"
+                      ref={dateInputRef}
+                      type="date"
+                      className="absolute inset-0 opacity-0 pointer-events-none w-1 h-1"
+                      value={selectedDate.toISOString().split('T')[0]}
+                      onChange={(e) => {
+                        const newDate = new Date(e.target.value);
+                        if (!isNaN(newDate.getTime())) {
+                          const now = new Date();
+                          if (newDate.toDateString() === now.toDateString()) {
+                            newDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+                          }
+                          setSelectedDate(newDate);
+                          setCoachAdvice(null);
+                        }
+                      }}
                     />
-                    <span className="absolute bottom-8 right-0 text-5xl font-black text-primary italic uppercase">KG</span>
+                    <button
+                      onClick={() => dateInputRef.current?.showPicker()}
+                      className="flex cursor-pointer items-center justify-center rounded-[2rem] size-24 bg-[#0a150a] text-white hover:bg-slate-800 transition-all active:scale-90 shadow-2xl border-4 border-primary/50"
+                    >
+                      <span className="material-symbols-outlined text-8xl">calendar_month</span>
+                    </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-8">
-                    <div className="bg-white/5 p-8 rounded-[2.5rem] flex flex-col items-center gap-4 border-2 border-white/5">
-                      <Calendar className="text-primary" size={48} />
-                      <input type="date" value={weightDate} onChange={(e) => setWeightDate(e.target.value)} className="bg-transparent text-3xl font-black outline-none text-center w-full" />
-                    </div>
-                    <div className="bg-white/5 p-8 rounded-[2.5rem] flex flex-col items-center gap-4 border-2 border-white/5">
-                      <Clock className="text-primary" size={48} />
-                      <input type="time" value={weightTime} onChange={(e) => setWeightTime(e.target.value)} className="bg-transparent text-3xl font-black outline-none text-center w-full" />
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleAddWeight}
-                    disabled={!newWeightValue || loading}
-                    className="w-full h-32 rounded-[2.5rem] bg-primary text-[#111811] font-black text-4xl shadow-3xl active:scale-95 transition-all flex items-center justify-center gap-6 disabled:opacity-30 uppercase italic"
-                  >
-                    {loading ? <Activity className="animate-spin text-5xl" /> : <Plus size={48} strokeWidth={5} />}
-                    Salva Peso
-                  </button>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* Trend Section */}
-          <section className="space-y-6">
-            <div className="flex items-center justify-between px-2">
-              <h2 className="text-4xl font-black italic uppercase tracking-tighter">Andamento</h2>
-              <div className="flex bg-white/5 p-2 rounded-2xl">
-                {['SETT', 'MESE', 'ANNO'].map((period) => (
-                  <button
-                    key={period}
-                    onClick={() => setWeightPeriod(period)}
-                    className={cn(
-                      "px-8 py-4 text-2xl font-black rounded-2xl transition-all uppercase tracking-tighter",
-                      weightPeriod === period ? "bg-[#22c55e] text-[#050a05]" : "text-white/40 hover:text-white/60"
-                    )}
-                  >
-                    {period}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-[#0a150a] border-2 border-white/5 rounded-[3rem] p-10 h-[28rem] relative shadow-2xl flex flex-col overflow-hidden">
-              <div className="absolute top-6 right-8 flex items-center gap-6 text-xl font-black text-white/40 uppercase tracking-[0.2em]">
-                <div className="flex items-center gap-2">
-                  <div className="size-4 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
-                  Obiettivo: {targetWeight > 0 ? `${targetWeight}kg` : '--'}
+                <div className="mt-8 px-8 py-8 bg-[#0a150a] dark:bg-primary/20 flex items-center justify-between gap-6 rounded-[2.5rem] border-4 border-primary/40 shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+                  <div className="flex items-center gap-6 text-white">
+                    <span className="material-symbols-outlined text-8xl drop-shadow-[0_0_20px_rgba(19,236,19,0.8)]">event</span>
+                    <h2 className="text-6xl font-black uppercase tracking-tighter italic drop-shadow-md">
+                      {selectedDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}
+                      {selectedDate.toDateString() === new Date().toDateString() && " (OGGI)"}
+                    </h2>
+                  </div>
+                  {selectedDate.toDateString() !== new Date().toDateString() && (
+                    <button onClick={() => setSelectedDate(new Date())} className="bg-primary text-[#050a05] px-10 py-8 rounded-3xl font-black text-4xl uppercase tracking-widest shadow-2xl active:scale-95 transition-all">OGGI</button>
+                  )}
                 </div>
               </div>
 
-              <div className="flex-1 w-full min-h-[300px] mt-8 relative" ref={chartContainerRef}>
-                {chartReady && chartWidth > 0 && (
-                  <ResponsiveContainer width={chartWidth} height="100%" minWidth={0} minHeight={0}>
-                    <BarChart data={chartData} margin={{ top: 40, right: 0, left: -30, bottom: 0 }}>
-                      <XAxis
-                        dataKey="day"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 16, fontWeight: 900 }}
-                        dy={15}
-                      />
-                      <Tooltip
-                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                        contentStyle={{ backgroundColor: '#121c12', border: '2px solid rgba(255,255,255,0.2)', borderRadius: '24px', fontWeight: 900, color: '#fff' }}
-                        itemStyle={{ color: '#fff' }}
-                      />
-                      <ReferenceLine y={targetWeight} stroke="#ef4444" strokeWidth={4} strokeDasharray="10 10" />
-                      <Bar dataKey="weight" radius={[12, 12, 0, 0]} barSize={40}>
-                        {chartData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={entry.weight > 0 ? (entry.isCurrent ? '#22c55e' : 'rgba(34,197,94,0.4)') : 'transparent'}
-                          />
-                        ))}
-                      </Bar>
-                      <Scatter dataKey="target" fill="#ef4444" shape="circle" line={false} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-                {currentWeight > 0 && (
-                  <div className="absolute right-6 top-[30%] text-white text-4xl font-black italic drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center gap-2">
-                    {currentWeight}
-                    <span className="text-xl not-italic opacity-40">kg</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-3 gap-4 px-1">
-            <StatCard label="Iniziale" value={`${initialWeight} kg`} />
-            <StatCard label="Persi" value={`${weightLost} kg`} accent />
-            <StatCard label="Mancanti" value={`${weightMissing} kg`} />
-          </div>
-
-          {/* History Section */}
-          <section className="space-y-6 pb-12">
-            <h2 className="text-4xl font-black italic uppercase tracking-tighter px-2">Cronologia</h2>
-            <div className="space-y-4">
-              {sortedWeights.length === 0 ? (
-                <p className="text-center text-white/30 py-20 text-2xl font-black bg-white/5 border-2 border-white/5 rounded-[3rem]">Nessun dato registrato.</p>
-              ) : (
-                [...sortedWeights].reverse().map((item, i) => (
+              <main className="w-full pb-16">
+                <div className="p-4">
                   <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="bg-[#121c12] border-2 border-white/5 rounded-[2.5rem] p-8 flex items-center justify-between group cursor-pointer hover:bg-[#1a281a] transition-all shadow-lg active:scale-98"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-white dark:bg-background-dark/60 backdrop-blur-3xl rounded-[3rem] p-10 shadow-[0_40px_100px_rgba(0,0,0,0.2)] dark:shadow-[0_40px_100px_rgba(0,0,0,0.5)] border-4 border-white/20 dark:border-white/5 flex flex-col items-center relative overflow-hidden"
                   >
-                    <div>
-                      <h4 className="text-2xl font-black text-white italic uppercase tracking-tight">
-                        {new Date(item.created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
-                      </h4>
-                      <p className="text-white/30 text-lg font-bold mt-1">
-                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                    <div className="absolute top-1 left-1 w-full h-3 bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+                    <div className="relative flex items-center justify-center p-8 mb-4">
+                      <svg viewBox="0 0 480 480" className="w-[90vw] max-w-[28rem] aspect-square progress-ring drop-shadow-[0_0_60px_rgba(19,236,19,0.4)]">
+                        <circle className="text-[#dbe6db] dark:text-white/5" cx="240" cy="240" fill="transparent" r="180" stroke="currentColor" strokeWidth="36" />
+                        <motion.circle
+                          initial={{ strokeDashoffset: 1131 }}
+                          animate={{ strokeDashoffset: 1131 - (1131 * Math.min(totalCalories / targetCalories, 1)) }}
+                          transition={{ duration: 2, ease: [0.34, 1.56, 0.64, 1] }}
+                          className="text-primary transition-all"
+                          cx="240" cy="240" fill="transparent" r="180" stroke="currentColor" strokeDasharray="1131" strokeLinecap="round" strokeWidth="36"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-9xl font-black text-[#111811] dark:text-white leading-none tracking-tighter drop-shadow-2xl">{totalCalories.toLocaleString()}</span>
+                        <span className="text-3xl text-primary font-black uppercase tracking-[0.5em] mt-4 italic">KCAL</span>
+                        <div className="my-5 h-2 w-20 bg-primary/20 rounded-full"></div>
+                        <span className="text-2xl text-[#618961] font-black italic opacity-60 uppercase tracking-widest text-center">Target {targetCalories.toLocaleString()}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-6">
-                      <span className="text-4xl font-black text-[#22c55e] italic">{item.weight}<span className="text-xl ml-1 not-italic font-bold text-white/40">kg</span></span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteWeight(item.id); }}
-                        className="p-3 bg-red-500/10 text-red-500 rounded-2xl active:scale-90 transition-all opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 size={24} />
-                      </button>
+                    <div className="text-center pt-10 border-t-4 border-[#dbe6db]/50 dark:border-white/10 w-full">
+                      <p className="text-6xl font-black text-[#618961] uppercase italic">Rimanenti: <span className="text-[#111811] dark:text-primary drop-shadow-[0_0_20px_rgba(19,236,19,0.5)]">{Math.max(0, targetCalories - totalCalories).toLocaleString()}</span></p>
                     </div>
                   </motion.div>
-                ))
-              )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-6 px-6 py-5">
+                  {/* Protein */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1, type: "spring" }}
+                    className="bg-white dark:bg-background-dark/60 backdrop-blur-xl rounded-2xl p-5 border-2 border-blue-100 dark:border-blue-500/20 flex flex-col items-center text-center shadow-[0_0_50px_rgba(59,130,246,0.15)] transition-all hover:shadow-[0_0_70px_rgba(59,130,246,0.3)] group"
+                  >
+                    <span className="material-symbols-outlined text-blue-500 mb-4 text-8xl drop-shadow-[0_0_20px_rgba(59,130,246,0.6)] group-hover:scale-110 transition-transform">restaurant_menu</span>
+                    <p className="text-2xl font-black text-blue-900 dark:text-blue-100 uppercase italic">PROT</p>
+                    <div className="w-full bg-blue-50 dark:bg-blue-950/40 h-5 rounded-full mt-6 overflow-hidden border border-blue-500/10">
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${proteinPercentage}%` }} transition={{ duration: 1.5 }} className="bg-blue-500 h-full rounded-full shadow-[0_0_15px_rgba(59,130,246,0.8)]" />
+                    </div>
+                    <p className="text-5xl text-blue-600 dark:text-blue-400 mt-6 font-black italic">{Math.round(totalProtein)}g</p>
+                    <p className="text-lg text-blue-500/40 font-bold uppercase mt-1">Goal {targetProtein}g</p>
+                  </motion.div>
+
+                  {/* Fats */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, type: "spring" }}
+                    className="bg-white dark:bg-background-dark/60 backdrop-blur-xl rounded-2xl p-5 border-2 border-amber-100 dark:border-amber-500/20 flex flex-col items-center text-center shadow-[0_0_50px_rgba(245,158,11,0.15)] transition-all hover:shadow-[0_0_70px_rgba(245,158,11,0.3)] group"
+                  >
+                    <span className="material-symbols-outlined text-amber-500 mb-4 text-8xl drop-shadow-[0_0_20px_rgba(245,158,11,0.6)] group-hover:scale-110 transition-transform">opacity</span>
+                    <p className="text-2xl font-black text-amber-900 dark:text-amber-100 uppercase italic">GRASSI</p>
+                    <div className="w-full bg-amber-50 dark:bg-amber-950/40 h-5 rounded-full mt-6 overflow-hidden border border-amber-500/10">
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${fatPercentage}%` }} transition={{ duration: 1.5 }} className="bg-amber-500 h-full rounded-full shadow-[0_0_15px_rgba(245,158,11,0.8)]" />
+                    </div>
+                    <p className="text-5xl text-amber-600 dark:text-amber-400 mt-6 font-black italic">{Math.round(totalFat)}g</p>
+                    <p className="text-lg text-amber-500/40 font-bold uppercase mt-1">Goal {targetFat}g</p>
+                  </motion.div>
+
+                  {/* Carbs */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, type: "spring" }}
+                    className="bg-white dark:bg-background-dark/60 backdrop-blur-xl rounded-2xl p-5 border-2 border-emerald-100 dark:border-emerald-500/20 flex flex-col items-center text-center shadow-[0_0_50px_rgba(16,185,129,0.15)] transition-all hover:shadow-[0_0_70px_rgba(16,185,129,0.3)] group"
+                  >
+                    <span className="material-symbols-outlined text-emerald-500 mb-4 text-8xl drop-shadow-[0_0_20px_rgba(16,185,129,0.6)] group-hover:scale-110 transition-transform">bakery_dining</span>
+                    <p className="text-2xl font-black text-emerald-900 dark:text-emerald-100 uppercase italic">CARBO</p>
+                    <div className="w-full bg-emerald-50 dark:bg-emerald-950/40 h-5 rounded-full mt-6 overflow-hidden border border-emerald-500/10">
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${carbsPercentage}%` }} transition={{ duration: 1.5 }} className="bg-emerald-500 h-full rounded-full shadow-[0_0_15px_rgba(16,185,129,0.8)]" />
+                    </div>
+                    <p className="text-5xl text-emerald-600 dark:text-emerald-400 mt-6 font-black italic">{Math.round(totalCarbs)}g</p>
+                    <p className="text-lg text-emerald-500/40 font-bold uppercase mt-1">Goal {targetCarbs}g</p>
+                  </motion.div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6 px-6 py-6">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    onClick={() => handleSetCurrentView('add-meal')}
+                    className="flex flex-col items-center justify-center gap-6 w-full h-32 rounded-3xl bg-gradient-to-br from-primary to-[#0ed10e] text-[#050a05] shadow-[0_30px_70px_rgba(19,236,19,0.3)] border-8 border-white/20 relative overflow-hidden group"
+                  >
+                    <span className="material-symbols-outlined text-5xl">add_circle</span>
+                    <span className="font-black text-4xl tracking-tighter italic uppercase">AGGIUNGI</span>
+                  </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    onClick={handleHoFame}
+                    className="flex flex-col items-center justify-center gap-6 w-full h-32 rounded-3xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-[0_30px_70px_rgba(245,158,11,0.3)] border-8 border-white/20 relative overflow-hidden group"
+                  >
+                    <span className="material-symbols-outlined text-5xl">restaurant</span>
+                    <span className="font-black text-4xl tracking-tighter italic uppercase">HO FAME</span>
+                  </motion.button>
+                </div>
+
+                {hungryAdvice && (
+                  <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} className="px-6 mb-6">
+                    <div className="bg-gradient-to-br from-amber-400/30 to-amber-500/10 rounded-3xl p-6 border-4 border-amber-400/40 shadow-3xl relative overflow-hidden">
+                      <div className="absolute top-1 right-1 p-6 opacity-5"><span className="material-symbols-outlined text-7xl">restaurant_menu</span></div>
+                      <button onClick={() => setHungryAdvice(null)} className="absolute top-5 right-5 size-6 bg-white/10 rounded-full flex items-center justify-center text-amber-900 dark:text-white/60 active:scale-90"><span className="material-symbols-outlined text-4xl">close</span></button>
+                      <div className="flex items-center gap-4 mb-5 text-amber-500"><span className="material-symbols-outlined text-7xl">restaurant</span><h3 className="font-black text-3xl uppercase italic tracking-widest">CONSIGLIO FAME</h3></div>
+                      <p className="text-5xl font-black italic text-amber-950 dark:text-white leading-tight mb-5">"{hungryAdvice.message}"</p>
+                      <div className="bg-white/50 dark:bg-black/40 backdrop-blur-md rounded-2xl p-6 border-2 border-amber-400/30 shadow-inner">
+                        <p className="text-6xl font-black text-amber-700 dark:text-amber-400 mb-4 italic tracking-tight">{hungryAdvice.snack}</p>
+                        <p className="text-3xl font-bold dark:text-white/70 italic leading-relaxed">{hungryAdvice.reason}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {profile?.goalDescription && (
+                  <div className="px-6 py-4">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white dark:bg-background-dark/40 backdrop-blur-2xl rounded-3xl p-6 border-2 border-primary/20 shadow-2xl relative overflow-hidden">
+                      <div className="absolute -bottom-10 -right-10 opacity-5"><span className="material-symbols-outlined text-7xl text-primary">auto_awesome</span></div>
+                      <div className="flex items-center gap-6 mb-6 text-primary"><span className="material-symbols-outlined text-7xl">psychology</span><h3 className="font-black text-3xl tracking-[0.3em] italic">AI COACH</h3></div>
+                      {loadingCoach ? (
+                        <div className="flex items-center gap-5 py-6"><div className="animate-spin size-8 border-8 border-primary border-t-transparent rounded-full" /><p className="text-4xl text-primary italic font-black animate-pulse">ANALIZZO I DATI...</p></div>
+                      ) : coachAdvice ? (
+                        <p className="text-5xl font-black italic text-[#111811] dark:text-white leading-snug tracking-tight uppercase">"{coachAdvice.tip}"</p>
+                      ) : null}
+                    </motion.div>
+                  </div>
+                )}
+
+                <div className="px-6 pb-6 mt-6">
+                  <div className="flex justify-between items-end mb-6 px-2"><h3 className="text-[#111811] dark:text-white text-5xl font-black italic uppercase tracking-tighter">I Tuoi Pasti</h3><button className="text-primary text-2xl font-black uppercase underline decoration-[6px] underline-offset-[12px] active:scale-95 transition-transform">Tutti i pasti</button></div>
+                  <div className="space-y-8">
+                    {meals.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center p-10 bg-white dark:bg-background-dark/30 rounded-3xl border-4 border-dashed border-[#dbe6db] dark:border-white/10 opacity-60"><span className="material-symbols-outlined text-5xl mb-6 text-[#618961]">flatware</span><p className="text-4xl font-black text-[#618961] italic">Nessun pasto registrato oggi.</p></div>
+                    ) : (
+                      meals.map((meal, idx) => (
+                        <motion.div
+                          key={meal.id}
+                          initial={{ opacity: 0, x: -50 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.1 }}
+                          onDoubleClick={() => setEditingMeal(meal)}
+                          className={`flex items-center gap-5 p-6 rounded-2xl border-4 shadow-[0_20px_50px_rgba(0,0,0,0.1)] active:scale-95 transition-all relative overflow-hidden group ${meal.status === 'pending' ? 'bg-primary/5 border-primary/20 cursor-wait' : meal.status === 'error' ? 'bg-red-50 dark:bg-red-950/20 border-red-500/20' : 'bg-white dark:bg-background-dark/60 backdrop-blur-2xl border-white/40 dark:border-white/5'}`}
+                        >
+                          <div className={`size-28 rounded-xl flex items-center justify-center shadow-lg ${meal.status === 'error' ? 'bg-red-500 text-white' : 'bg-primary/10 text-primary'}`}>
+                            {meal.status === 'pending' ? <Loader2 className="animate-spin size-8" /> : meal.status === 'error' ? <AlertTriangle className="size-8" /> : <span className="material-symbols-outlined text-4xl">restaurant</span>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-5xl font-black italic uppercase tracking-tighter truncate leading-tight">{meal.name}</h4>
+                            <div className="flex items-center gap-4 mt-2"><span className="text-3xl font-bold opacity-40 italic">{meal.quantity}g</span><div className="size-2 rounded-full bg-primary/30" /><span className="text-3xl font-black text-primary italic uppercase tracking-widest">{meal.calories} KCAL</span></div>
+                          </div>
+                          <div className="flex flex-col items-end gap-4">
+                            <div className="text-2xl text-white/30 font-black italic bg-black/20 px-4 py-2 rounded-full">{new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteMeal(meal.id); }} className="size-10 rounded-3xl bg-red-500/10 text-red-500 flex shrink-0 items-center justify-center active:scale-90 opacity-0 group-hover:opacity-100 transition-all shadow-lg border-2 border-red-500/10"><Trash2 size={40} /></button>
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </main>
             </div>
-          </section>
-        </main>
-
-        <nav className="fixed bottom-0 left-0 right-0 bg-[#050a05]/95 backdrop-blur-xl border-t-8 border-white/5 px-4 py-8 pb-14 flex justify-around items-center z-40 shadow-[0_-20px_60px_rgba(0,0,0,0.4)]">
-          <NavItem icon={<Activity />} label="Home" active={false} onClick={() => handleSetCurrentView('dashboard')} />
-          <NavItem icon={<TrendingUp />} label="Peso" active={true} onClick={() => { }} />
-          <NavItem icon={<Monitor />} label="Premi" active={false} onClick={() => { }} />
-          <NavItem icon={<User />} label="Profilo" active={false} onClick={() => router.push('/profile')} />
-        </nav>
-      </div>
-    );
-  }
-  return (
-    <div className="bg-background-light dark:bg-background-dark min-h-screen text-[#111811] dark:text-white transition-colors duration-300 antialiased font-sans">
-      {/* Top Navigation Bar */}
-      <div className="sticky top-0 z-10 flex flex-col bg-white/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-[#dbe6db]/30 shadow-sm">
-        <div className="flex items-center px-4 py-8 justify-between">
-          <div
-            onClick={() => router.push('/profile')}
-            className="flex size-24 shrink-0 items-center justify-center cursor-pointer active:scale-95 transition-transform"
-          >
-            <div
-              className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-24 border-4 border-primary shadow-lg"
-              style={{
-                backgroundImage: user?.photoURL ? `url("${user.photoURL}")` : `url("https://lh3.googleusercontent.com/aida-public/AB6AXuBFAmglX_uCu_WV-qOLzoOA-CE_0bUcHzS1_PfOGohbq1vTiE0UrReWotFOAHEkz7FuVQwWJj1YvWUPZTywZaUe87zzgy4JFmR334tzQv7wsF6WTJd_AqR5-SKgjSK2u9ySnFoxPFkP30UMBB4MpHzE6QIeZ9-9ZAxV2AWmwQ_IFtcEY8rKNFB_9_H0QKu4rxqax1AqfAgpKdPy74cfTk7n-s-A27LL0c4_3SdORyyFUXTDwqCelSV3dO1pTwmNSnvxc7TMRYUA1A")`
-              }}
-            ></div>
-          </div>
-          <h1 className="text-[#111811] dark:text-white text-4xl font-black leading-tight tracking-tight flex-1 text-center italic">DIETA</h1>
-          <div className="flex w-24 items-center justify-end relative">
-            <input
-              ref={dateInputRef}
-              type="date"
-              className="absolute inset-0 opacity-0 pointer-events-none w-0 h-0"
-              value={selectedDate.toISOString().split('T')[0]}
-              onChange={(e) => {
-                const newDate = new Date(e.target.value);
-                if (!isNaN(newDate.getTime())) {
-                  setSelectedDate(newDate);
-                  setCoachAdvice(null);
-                }
-              }}
-            />
-            <button
-              onClick={() => dateInputRef.current?.showPicker()}
-              className="flex cursor-pointer items-center justify-center rounded-2xl h-12 w-12 bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-90 shadow-inner border-2 border-primary/20"
-            >
-              <span className="material-symbols-outlined text-3xl">calendar_month</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Selected Date Indicator */}
-        <div className="px-4 py-6 bg-primary/5 flex items-center justify-between gap-4 border-t-2 border-primary/10">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-2xl text-primary drop-shadow-sm">event</span>
-            <h2 className="text-lg font-black uppercase tracking-tighter text-primary italic">
-              {selectedDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
-              {selectedDate.toDateString() === new Date().toDateString() && " (OGGI)"}
-            </h2>
-          </div>
-          {selectedDate.toDateString() !== new Date().toDateString() && (
-            <button
-              onClick={() => setSelectedDate(new Date())}
-              className="bg-primary text-white px-6 py-2 rounded-2xl font-black text-xl uppercase tracking-widest shadow-lg active:scale-95 transition-all"
-            >
-              OGGI
-            </button>
-          )}
-        </div>
-      </div>
-
-      <main className="w-full pb-32">
-        {/* Main Summary Card */}
-        <div className="p-4 mt-2">
-          <div className="bg-white dark:bg-background-dark rounded-xl p-6 shadow-sm border border-[#dbe6db] dark:border-white/10 flex flex-col items-center">
-            <div className="relative flex items-center justify-center mb-10 scale-110">
-              {/* Progress Circle */}
-              <svg className="w-96 h-96 progress-ring">
-                <circle className="text-[#dbe6db] dark:text-white/10" cx="192" cy="192" fill="transparent" r="135" stroke="currentColor" strokeWidth="28" />
-                <circle
-                  className="text-primary transition-all duration-1000"
-                  cx="192"
-                  cy="192"
-                  fill="transparent"
-                  r="135"
-                  stroke="currentColor"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  strokeLinecap="round"
-                  strokeWidth="28"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center translate-y-4">
-                <span className="text-7xl font-black text-[#111811] dark:text-white leading-none">{totalCalories.toLocaleString()}</span>
-                <span className="text-xl text-[#618961] font-black uppercase tracking-widest mt-2">KCAL</span>
-                <div className="my-4 h-1 w-20 bg-[#dbe6db]"></div>
-                <span className="text-lg text-[#618961] font-black italic">Target: {targetCalories.toLocaleString()}</span>
-              </div>
-            </div>
-            <div className="text-center pt-4">
-              <p className="text-3xl font-black text-[#618961]">Rimanenti: <span className="text-[#111811] dark:text-white">{Math.max(0, targetCalories - totalCalories).toLocaleString()} kcal</span></p>
-            </div>
-          </div>
-        </div>
-
-        {/* Macronutrients Grid */}
-        <div className="grid grid-cols-3 gap-6 px-4 py-8">
-          {/* Protein */}
-          <div className="bg-white dark:bg-background-dark rounded-[2.5rem] p-6 border-2 border-[#dbe6db] dark:border-white/20 flex flex-col items-center text-center">
-            <span className="material-symbols-outlined text-primary mb-3 text-6xl">restaurant_menu</span>
-            <p className="text-xl font-black text-[#111811] dark:text-white">PROT</p>
-            <div className="w-full bg-[#dbe6db] dark:bg-white/10 h-4 rounded-full mt-4 overflow-hidden">
-              <div className="bg-primary h-full rounded-full transition-all duration-1000" style={{ width: `${proteinPercentage}%` }}></div>
-            </div>
-            <p className="text-lg text-[#618961] mt-4 font-black">{Math.round(totalProtein)}g</p>
-            <p className="text-sm text-[#618961]/60 font-bold">Goal {targetProtein}g</p>
-          </div>
-          {/* Fats */}
-          <div className="bg-white dark:bg-background-dark rounded-[2.5rem] p-6 border-2 border-[#dbe6db] dark:border-white/20 flex flex-col items-center text-center">
-            <span className="material-symbols-outlined text-primary mb-3 text-6xl">opacity</span>
-            <p className="text-xl font-black text-[#111811] dark:text-white">GRASSI</p>
-            <div className="w-full bg-[#dbe6db] dark:bg-white/10 h-4 rounded-full mt-4 overflow-hidden">
-              <div className="bg-primary h-full rounded-full transition-all duration-1000" style={{ width: `${fatPercentage}%` }}></div>
-            </div>
-            <p className="text-lg text-[#618961] mt-2 font-black">{Math.round(totalFat)}g</p>
-            <p className="text-[10px] text-[#618961]/60 font-bold uppercase">Goal {targetFat}g</p>
-          </div>
-          {/* Carbs */}
-          <div className="bg-white dark:bg-background-dark rounded-[2.5rem] p-6 border-2 border-[#dbe6db] dark:border-white/20 flex flex-col items-center text-center">
-            <span className="material-symbols-outlined text-primary mb-3 text-6xl">bakery_dining</span>
-            <p className="text-xl font-black text-[#111811] dark:text-white">CARBO</p>
-            <div className="w-full bg-[#dbe6db] dark:bg-white/10 h-4 rounded-full mt-4 overflow-hidden">
-              <div className="bg-primary h-full rounded-full transition-all duration-1000" style={{ width: `${carbsPercentage}%` }}></div>
-            </div>
-            <p className="text-lg text-[#618961] mt-2 font-black">{Math.round(totalCarbs)}g</p>
-            <p className="text-[10px] text-[#618961]/60 font-bold uppercase">Goal {targetCarbs}g</p>
-          </div>
-        </div>
-
-        {/* Action Buttons Section */}
-        {/* Action Buttons Section */}
-        <div className="flex flex-col gap-10 px-4 py-12">
-          <button
-            onClick={() => handleSetCurrentView('add-meal')}
-            className="flex items-center justify-center gap-4 w-full h-24 rounded-2xl bg-primary text-[#111811] font-black text-3xl shadow-2xl shadow-primary/30 active:scale-95 transition-transform"
-          >
-            <span className="material-symbols-outlined text-4xl">add_circle</span>
-            <span>AGGIUNGI PASTO</span>
-          </button>
-
-          <button
-            onClick={handleHoFame}
-            disabled={loadingHungry}
-            className="flex items-center justify-center gap-4 w-full h-24 rounded-2xl bg-amber-400 text-[#111811] font-black text-3xl shadow-2xl shadow-amber-400/30 active:scale-95 transition-transform disabled:opacity-50 mt-2 border-b-4 border-amber-600/30"
-          >
-            <span className="material-symbols-outlined text-4xl">{loadingHungry ? 'hourglass_empty' : 'fastfood'}</span>
-            <span>HO FAME!</span>
-          </button>
-
-          <button onClick={() => handleSetCurrentView('weight')} className="flex items-center justify-center gap-4 w-full h-24 rounded-2xl bg-white dark:bg-white/5 border-2 border-[#dbe6db] dark:border-white/10 text-[#111811] dark:text-white font-black text-3xl active:scale-95 transition-transform">
-            <span className="material-symbols-outlined text-4xl">trending_up</span>
-            <span>IL MIO PESO</span>
-          </button>
-        </div>
-
-        {/* Hungry Advice Card */}
-        {hungryAdvice && (
-          <div className="px-4 mb-8">
-            <div className="bg-gradient-to-br from-amber-400/20 to-amber-500/10 rounded-[2.5rem] p-8 border-4 border-amber-400/30 shadow-xl relative overflow-hidden animate-in zoom-in-95 duration-500">
-              <button
-                onClick={() => setHungryAdvice(null)}
-                className="absolute top-4 right-4 text-amber-900 dark:text-amber-100 opacity-50 hover:opacity-100"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-              <div className="flex items-center gap-4 mb-6 text-amber-600 dark:text-amber-400">
-                <span className="material-symbols-outlined text-5xl">restaurant</span>
-                <h3 className="font-black text-2xl uppercase tracking-widest italic">SPUNTINO CONSIGLIATO</h3>
-              </div>
-              <p className="text-4xl font-black italic text-amber-900 dark:text-amber-50 leading-tight mb-4">
-                "{hungryAdvice.message}"
-              </p>
-              <div className="bg-white/40 dark:bg-black/40 rounded-3xl p-6 border-2 border-amber-400/20">
-                <p className="text-3xl font-black text-amber-700 dark:text-amber-300 mb-2">{hungryAdvice.snack}</p>
-                <p className="text-xl font-bold text-amber-800/70 dark:text-amber-200/70 italic">{hungryAdvice.reason}</p>
-              </div>
-            </div>
-          </div>
+          </motion.div>
         )}
 
-        {/* Daily Coach Section */}
-        {profile?.goalDescription && (
-          <div className="px-4 py-2">
-            <div className="bg-gradient-to-br from-[#13ec13]/10 to-[#13ec13]/5 rounded-[2rem] p-6 border border-[#13ec13]/20 shadow-sm overflow-hidden relative">
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                <span className="material-symbols-outlined text-6xl">auto_awesome</span>
-              </div>
+        {currentView === 'weight' && (
+          <motion.div
+            key="weight"
+            custom={swipeDirection}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            drag="x"
+            dragDirectionLock
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.2}
+            onDragEnd={(e, { offset }) => {
+              if (offset.x > 50) handleSwipe('right');
+            }}
+            onAnimationComplete={() => setWeightViewReady(true)}
+            onAnimationStart={(def) => { if (def === 'exit') setWeightViewReady(false); }}
+            className="w-full flex flex-col"
+          >
+            <div className="w-full max-w-lg mx-auto">
+              <header className="flex items-center justify-between px-5 py-6 sticky top-1 bg-[#050a05]/80 backdrop-blur-3xl z-30 border-b border-white/5">
+                <button onClick={() => handleSwipe('right')} className="size-10 rounded-xl bg-white/5 flex items-center justify-center active:scale-90 border-2 border-white/10 shadow-inner group"><ChevronLeft size={48} className="text-primary group-hover:-translate-x-1 transition-transform" /></button>
+                <h1 className="text-5xl font-black italic uppercase tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">PESO</h1>
+                <div className="size-10" />
+              </header>
 
-              <div className="flex items-center gap-4 mb-8 text-[#111811] dark:text-white/80">
-                <span className="material-symbols-outlined text-5xl">psychology</span>
-                <h3 className="font-black text-2xl uppercase tracking-[0.2em]">IL TUO AI COACH</h3>
-              </div>
+              <main className="flex-1 px-5 space-y-10 py-6">
+                <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#122412] to-[#050a05] backdrop-blur-3xl border border-primary/30 rounded-[3rem] p-10 text-center shadow-[0_20px_60px_rgba(34,197,94,0.15)] relative overflow-hidden group">
+                  <div className="absolute -top-10 -right-10 opacity-10 scale-150 rotate-12 transition-transform duration-1000 group-hover:rotate-0 group-hover:scale-125"><TrendingUp size={150} className="text-primary" /></div>
+                  <p className="text-white/60 text-sm font-black uppercase tracking-[0.4em] mb-4 italic">Situazione Attuale</p>
+                  <div className="flex items-baseline justify-center gap-2 font-black italic">
+                    <span className="text-8xl text-transparent bg-clip-text bg-gradient-to-r from-primary to-green-300 drop-shadow-[0_0_20px_rgba(19,236,19,0.4)] tracking-tighter">{currentWeight || "--.-"}</span>
+                    <span className="text-4xl text-primary/70 uppercase">kg</span>
+                  </div>
+                  <div className={cn("mt-8 inline-flex items-center gap-3 px-6 py-4 rounded-xl text-sm font-black italic uppercase tracking-wider backdrop-blur-lg shadow-inner transition-all", weeklyDelta <= 0 ? "bg-primary/10 text-primary border border-primary/20" : "bg-red-500/10 text-red-500 border border-red-500/20")}>
+                    <TrendingUp className={cn("size-6", weeklyDelta > 0 && "rotate-180")} />
+                    <span>{weeklyDelta > 0 ? "+" : ""}{weeklyDelta} KG QUESTA SETTIMANA</span>
+                  </div>
+                </motion.div>
 
-              {loadingCoach ? (
-                <div className="flex items-center gap-6 py-8">
-                  <div className="animate-spin size-10 border-4 border-primary border-t-transparent rounded-full"></div>
-                  <p className="text-2xl text-[#618961] italic font-black">STRIZZO IL CERVELLO...</p>
+                <div className="bg-[#121c12] rounded-[3rem] p-4 flex flex-col gap-6 text-center border border-white/5 shadow-2xl relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 hover:opacity-100 transition-opacity" />
+                  <button
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => {
+                      console.log("NUOVA PESATA CLICKED");
+                      setIsAddingWeight(true);
+                    }}
+                    className="bg-primary hover:bg-[#1eb054] text-[#050a05] font-black w-full py-10 rounded-2xl transition-all active:scale-95 shadow-[0_10px_30px_rgba(19,236,19,0.3)] text-4xl uppercase italic tracking-tighter flex items-center justify-center gap-6 relative z-50 pointer-events-auto"
+                  >
+                    <Plus size={48} strokeWidth={4} /> NUOVA PESATA
+                  </button>
                 </div>
-              ) : coachAdvice ? (
-                <div className="space-y-12">
-                  <p className="text-4xl sm:text-5xl font-black leading-tight italic text-[#111811] dark:text-white">
-                    "{coachAdvice.tip}"
-                  </p>
 
-                  <div className="pt-6">
-                    <button
-                      onClick={() => setShowRecipe(!showRecipe)}
-                      className="flex items-center justify-center gap-4 w-full h-24 text-3xl font-black uppercase tracking-tighter text-[#111811] bg-primary/20 rounded-[2.5rem] hover:bg-primary/30 transition-all active:scale-95"
-                    >
-                      <span className="material-symbols-outlined text-5xl">{showRecipe ? 'expand_less' : 'restaurant'}</span>
-                      {showRecipe ? 'NASCONDI RICETTA' : 'RICETTA SUGGERITA'}
-                    </button>
+                <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} className="bg-white dark:bg-[#121c12]/50 backdrop-blur-2xl border border-primary/20 dark:border-white/10 rounded-[2rem] p-8 flex items-center justify-between shadow-xl">
+                  <div className="flex items-center gap-6">
+                    <div className="size-16 rounded-2xl bg-red-500/20 flex items-center justify-center border border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+                      <div className="size-4 rounded-full bg-red-500 shadow-[0_0_15px_rgba(239,68,68,1)] animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black text-slate-500 dark:text-white/40 uppercase tracking-[0.3em] mb-1 italic">OBIETTIVO FINALE</h3>
+                      <p className="text-4xl font-black text-[#111811] dark:text-white italic tracking-tighter flex items-baseline gap-1">{targetWeight > 0 ? targetWeight : "--"} <span className="text-base opacity-40 not-italic uppercase">kg</span></p>
+                    </div>
+                  </div>
+                </motion.div>
 
-                    {showRecipe && (
-                      <div className="mt-12 bg-white/70 dark:bg-black/50 rounded-[3.5rem] p-12 border-4 border-[#13ec13]/30 animate-in fade-in slide-in-from-top-6 duration-700 shadow-2xl">
-                        <h4 className="font-black text-5xl mb-6 capitalize text-[#111811] italic">{coachAdvice.recipe.name}</h4>
-                        <p className="text-3xl text-[#111811] dark:text-white mb-10 leading-relaxed font-bold">{coachAdvice.recipe.content}</p>
-                        <div className="flex items-start gap-6 text-2xl font-black text-[#111811] bg-primary/10 p-10 rounded-[3rem] italic border-2 border-primary/20">
-                          <span className="material-symbols-outlined text-5xl shrink-0 text-primary">lightbulb</span>
-                          <span>{coachAdvice.recipe.why}</span>
-                        </div>
+                <section className="space-y-12">
+                  <div className="flex items-center justify-between px-2">
+                    <h2 className="text-3xl font-black italic uppercase tracking-tighter text-[#111811] dark:text-white">Andamento <span className="text-xs opacity-20 not-italic ml-2">({chartData.length} pts)</span></h2>
+                    <div className="flex bg-slate-200/50 dark:bg-white/5 p-2 rounded-2xl border border-slate-300/50 dark:border-white/5">
+                      {['SETTIMANA', 'ANNO'].map((period) => (
+                        <button key={period} onClick={() => setWeightPeriod(period.substring(0, 4).toUpperCase())} className={cn("px-8 py-4 text-xl font-black rounded-xl transition-all uppercase tracking-tighter", weightPeriod === period.substring(0, 4).toUpperCase() ? "bg-primary text-[#050a05] shadow-md" : "text-slate-500 dark:text-white/30 hover:text-slate-800 dark:hover:text-white/60")}>
+                          {period}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-[#0a150a] border border-white/5 rounded-3xl p-4 relative shadow-2xl overflow-hidden">
+                    {isMounted && weightViewReady && chartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={260}>
+                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#13ec13" stopOpacity={0.5} />
+                              <stop offset="95%" stopColor="#13ec13" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                          <YAxis domain={['dataMin - 0.5', 'dataMax + 0.5']} hide />
+                          <XAxis
+                            dataKey="day"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 600 }}
+                            minTickGap={10}
+                          />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="bg-[#0a150a] border border-white/10 p-2 rounded-xl shadow-xl">
+                                    <p className="text-primary font-black text-xl italic">{payload[0].value} kg</p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="weight"
+                            stroke="#13ec13"
+                            strokeWidth={4}
+                            fillOpacity={1}
+                            fill="url(#colorWeight)"
+                            isAnimationActive={false}
+                            dot={{ r: 4, fill: '#13ec13', strokeWidth: 0 }}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-white/20 italic gap-2">
+                        <Activity size={32} className="opacity-20 animate-pulse" />
+                        <span className="text-sm">Nessun dato nel periodo selezionato</span>
                       </div>
                     )}
                   </div>
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <p className="text-2xl font-black text-[#618961] mb-4">Non sono riuscito a caricare i consigli.</p>
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem('coachAdviceCache');
-                      window.location.reload();
-                    }}
-                    className="text-xl font-black text-primary underline uppercase tracking-widest"
-                  >
-                    Riprova ora
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+                </section>
 
-        {/* Recent Activity Section */}
-        <div className="px-4 pb-12 mt-8">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="text-[#111811] dark:text-white text-2xl font-black italic">I TUOI PASTI</h3>
-            <button className="text-primary text-xl font-black uppercase underline decoration-4 underline-offset-8">Tutti</button>
-          </div>
-          <div className="space-y-6">
-            {meals.length === 0 ? (
-              <p className="text-center text-[#618961] py-12 text-2xl font-bold bg-white dark:bg-background-dark rounded-[2.5rem] border-4 border-[#dbe6db] dark:border-white/10">Nessun pasto oggi.</p>
-            ) : (
-              meals.map(meal => {
-                let timer;
-                const handleTouchStart = () => {
-                  timer = setTimeout(() => {
-                    setEditingMeal(meal);
-                  }, 600);
-                };
-                const handleTouchEnd = () => {
-                  clearTimeout(timer);
-                };
-
-                return (
-                  <div
-                    key={meal.id}
-                    onDoubleClick={() => setEditingMeal(meal)}
-                    onTouchStart={handleTouchStart}
-                    onTouchEnd={handleTouchEnd}
-                    className={`flex items-center gap-6 p-8 rounded-[2.5rem] border-4 shadow-md active:scale-95 transition-transform ${meal.status === 'pending' ? 'bg-primary/5 dark:bg-primary/5 border-primary/20 cursor-wait' : meal.status === 'error' ? 'bg-red-50 dark:bg-red-950/20 border-red-500/20' : 'bg-white dark:bg-background-dark border-[#dbe6db] dark:border-white/20'}`}
-                  >
-                    <div className={`size-20 rounded-2xl flex items-center justify-center ${meal.status === 'error' ? 'bg-red-500/20 text-red-500' : 'bg-primary/20 text-primary'}`}>
-                      {meal.status === 'pending' ? (
-                        <Loader2 className="animate-spin text-4xl" />
-                      ) : meal.status === 'error' ? (
-                        <AlertTriangle className="text-4xl" />
-                      ) : (
-                        <span className="material-symbols-outlined text-5xl">restaurant</span>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className={`text-4xl font-black capitalize ${meal.status === 'error' ? 'text-red-500 dark:text-red-400' : 'text-[#111811] dark:text-white'}`}>{meal.name}</h4>
-                      {meal.status === 'error' && <p className="text-xl font-bold text-red-500/70">{meal.analysis}</p>}
-                      {meal.status !== 'pending' && meal.status !== 'error' && (
-                        <p className="text-2xl text-[#618961] mt-2 font-bold">{meal.quantity}g</p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      {meal.status === 'pending' ? (
-                        <p className="text-xl font-black text-amber-500 animate-pulse uppercase tracking-widest mt-2">Attendere...</p>
-                      ) : meal.status === 'error' ? (
-                        <p className="text-xl font-bold text-red-500 underline mt-2">Modifica</p>
-                      ) : (
-                        <>
-                          <p className="text-3xl font-black text-[#111811] dark:text-white white-nowrap">{meal.calories} kcal</p>
-                          <p className="text-lg text-[#618961] font-bold mt-1">{new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                        </>
-                      )}
-                    </div>
-                    {meal.status !== 'pending' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteMeal(meal.id); }}
-                        className="size-16 ml-2 rounded-2xl bg-red-500/10 text-red-500 flex shrink-0 items-center justify-center active:scale-90 transition-all"
-                      >
-                        <Trash2 size={24} />
-                      </button>
+                <section className="space-y-10 pb-6">
+                  <h2 className="text-5xl font-black italic uppercase tracking-tighter px-4 text-[#111811] dark:text-white">Cronologia Pesate</h2>
+                  <div className="space-y-6">
+                    {sortedWeights.length === 0 ? (
+                      <div className="text-center py-10 bg-white/5 rounded-3xl border-4 border-dashed border-white/10 italic font-bold text-white/30 text-3xl">Nessun dato registrato.</div>
+                    ) : (
+                      [...sortedWeights].reverse().map((item, i) => (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, x: -30 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          className="bg-[#121c12]/80 backdrop-blur-2xl border-2 border-white/5 rounded-2xl p-6 flex items-center justify-between group active:scale-98 transition-all shadow-xl"
+                        >
+                          <div className="flex items-center gap-10">
+                            <div className="size-24 rounded-3xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors"><Calendar size={48} className="text-primary" /></div>
+                            <div>
+                              <h4 className="text-4xl font-black text-[#111811] dark:text-white italic uppercase tracking-tight">{new Date(getWeightTime(item)).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}</h4>
+                              <p className="text-slate-500 dark:text-white/40 text-2xl font-bold mt-2 italic">{new Date(getWeightTime(item)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-10">
+                            <span className="text-5xl font-black text-primary italic drop-shadow-[0_0_15px_rgba(34,197,94,0.3)]">{item.weight}<span className="text-2xl ml-2 not-italic font-bold text-slate-400 dark:text-white/20">kg</span></span>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteWeight(item.id); }} className="size-10 bg-red-500/10 text-red-500 rounded-3xl active:scale-75 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center border-2 border-red-500/10"><Trash2 size={40} /></button>
+                          </div>
+                        </motion.div>
+                      ))
                     )}
                   </div>
-                );
-              })
-            )}
+                </section>
+              </main>
+            </div>
+          </motion.div>
+        )}
+
+        {currentView === 'hungry' && (
+          <motion.div
+            key="hungry"
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="w-full min-h-screen bg-[#0a0f0a] flex flex-col"
+          >
+            <header className="flex items-center justify-between px-6 py-6 sticky top-1 bg-[#0a0f0a]/90 backdrop-blur-2xl z-30 border-b border-white/5">
+              <button onClick={() => setCurrentView('dashboard')} className="flex items-center gap-6 text-primary font-black text-3xl bg-primary/10 px-6 py-6 rounded-2xl active:scale-90 transition-transform"><ChevronLeft size={50} /> DASHBOARD</button>
+              <h1 className="text-5xl font-black italic uppercase tracking-tighter text-primary drop-shadow-[0_0_15px_rgba(19,236,19,0.3)]">HO FAME</h1>
+              <div className="w-10" />
+            </header>
+            <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full">
+              {!hungryAdvice && loadingHungry ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-6"><div className="animate-spin size-24 border-[8px] border-primary border-t-transparent rounded-full shadow-[0_0_50px_rgba(19,236,19,0.4)]"></div><p className="text-2xl text-primary italic font-black animate-pulse tracking-tighter">AI STA CUCINANDO...</p></div>
+              ) : hungryAdvice ? (
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-[#121c12]/80 backdrop-blur-3xl rounded-3xl p-8 border-4 border-amber-400 shadow-[0_30px_60px_rgba(245,158,11,0.2)] relative overflow-hidden">
+                  <div className="absolute -top-10 -right-10 opacity-5 rotate-12"><span className="material-symbols-outlined text-[10rem]">restaurant</span></div>
+                  <div className="flex items-center gap-4 mb-6 text-amber-500"><span className="material-symbols-outlined text-5xl">restaurant</span><div><h3 className="font-black text-2xl uppercase tracking-tighter leading-none mb-1">CONSIGLIO</h3><p className="text-sm font-bold opacity-70 italic tracking-widest">DI ALTA CUCINA AI</p></div></div>
+                  <div className="space-y-8">
+                    <p className="text-3xl font-black italic text-white leading-tight tracking-tighter">"{hungryAdvice.message}"</p>
+                    <div className="bg-amber-400/10 rounded-2xl p-6 border-2 border-amber-400/20 shadow-inner">
+                      <p className="text-sm font-black text-amber-500 uppercase tracking-[0.4em] mb-4 text-center">SPUNTINO PERFETTO</p>
+                      <p className="text-4xl font-black text-amber-400 mb-6 text-center leading-none italic drop-shadow-md">{hungryAdvice.snack}</p>
+                      <div className="h-1 w-16 bg-amber-400/30 mx-auto mb-6 rounded-full"></div>
+                      <p className="text-xl font-bold text-white/80 italic text-center leading-relaxed tracking-tight">{hungryAdvice.reason}</p>
+                    </div>
+                    <button onClick={() => handleHoFame()} className="w-full py-5 rounded-2xl bg-amber-500 text-[#050a05] font-black text-2xl shadow-[0_20px_40px_rgba(245,158,11,0.3)] active:scale-95 transition-all flex items-center justify-center gap-4 uppercase italic border-2 border-white/20"><span className="material-symbols-outlined text-3xl">refresh</span>Cambia snack</button>
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12"><button onClick={() => handleHoFame()} className="w-full h-64 rounded-3xl bg-amber-500 text-[#050a05] font-black text-5xl shadow-[0_30px_70px_rgba(245,158,11,0.3)] active:scale-95 transition-all border-8 border-white/20 flex flex-col items-center justify-center gap-6 group"><span className="material-symbols-outlined text-[8rem] group-hover:scale-110 transition-transform duration-300">emoji_food_beverage</span>DIMMELO TU!</button></div>
+              )}
+            </main>
+          </motion.div>
+        )}
+
+        {currentView === 'add-meal' && (
+          <motion.div
+            key="add-meal"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            className="absolute inset-0 z-[60] bg-background-light dark:bg-[#050a05] px-0 sm:px-6 pt-4 min-h-screen overflow-y-auto"
+          >
+            <div className="max-w-4xl mx-auto pb-4">
+              <div className="flex items-center justify-between mb-4 px-4">
+                <button onClick={() => handleSetCurrentView('dashboard')} className="flex items-center gap-4 text-base bg-primary/10 px-4 py-4 rounded-xl active:scale-90 transition-transform"><ChevronLeft size={40} strokeWidth={4} /> INDIETRO</button>
+                <div className="flex flex-col items-end">
+                  <span className="text-xs font-bold text-primary/40 uppercase tracking-[0.3em] mb-1 italic">NUOVO INSERIMENTO (v1.2)</span>
+                  <span className="text-3xl font-black italic uppercase tracking-tighter">AGGIUNGI PASTO</span>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-background-dark/40 backdrop-blur-3xl rounded-3xl border-4 border-white/10 shadow-[0_50px_150px_rgba(0,0,0,0.4)] overflow-hidden">
+                <CameraInput onMealAdded={() => handleSetCurrentView('dashboard')} onMealIdentified={handleMealIdentified} onProductEvaluated={handleProductEvaluated} defaultDate={selectedDate} initialMode={inputMode} profile={profile} />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Shared Modals/Overlays */}
+      {
+        isAddingWeight && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-[#050a05]/98 backdrop-blur-[50px] animate-in fade-in duration-500">
+            <motion.div initial={{ scale: 0.8, opacity: 0, y: 50 }} animate={{ scale: 1, opacity: 1, y: 0 }} transition={{ type: "spring", damping: 25 }} className="w-full max-w-2xl bg-[#0a150a] border-[6px] border-primary/30 rounded-3xl p-10 shadow-[0_0_150px_rgba(19,236,19,0.2)]">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-4xl font-black italic uppercase tracking-tighter text-white leading-none">NUOVA PESATA</h2>
+                <button onClick={() => setIsAddingWeight(false)} className="size-10 rounded-full bg-white/5 flex items-center justify-center text-white/40 active:scale-90 border-2 border-white/10"><Plus className="rotate-45 size-8" /></button>
+              </div>
+              <div className="space-y-16">
+                <div className="relative group">
+                  <input type="number" inputMode="decimal" step="0.1" autoFocus value={newWeightValue} onChange={(e) => setNewWeightValue(e.target.value)} placeholder="00.0" className="w-full text-7xl font-black bg-transparent text-center border-b-[12px] border-primary/20 focus:border-primary outline-none py-6 text-white transition-all placeholder:text-white/5 italic tracking-tighter" />
+                  <span className="absolute bottom-10 right-1 text-5xl font-black text-primary italic uppercase tracking-tighter opacity-50">KG</span>
+                </div>
+                <div className="flex flex-col gap-6">
+                  <div className="bg-white/5 p-8 rounded-[2.5rem] flex flex-col items-center gap-6 border-4 border-white/5 shadow-inner">
+                    <span className="text-xl font-black text-white/40 tracking-[0.3em] text-center uppercase italic">GIORNO</span>
+                    <input type="date" value={weightDate} onChange={(e) => setWeightDate(e.target.value)} className="bg-transparent text-5xl font-black outline-none text-center w-full text-white" />
+                  </div>
+                  <div className="bg-white/5 p-8 rounded-[2.5rem] flex flex-col items-center gap-6 border-4 border-white/5 shadow-inner">
+                    <span className="text-xl font-black text-white/40 tracking-[0.3em] text-center uppercase italic">ORA</span>
+                    <input type="time" value={weightTime} onChange={(e) => setWeightTime(e.target.value)} className="bg-transparent text-5xl font-black outline-none text-center w-full text-white" />
+                  </div>
+                </div>
+                <button onClick={handleAddWeight} disabled={!newWeightValue || loading} className="w-full h-32 rounded-3xl bg-gradient-to-r from-primary to-[#0ed10e] text-[#050a05] shadow-[0_30px_70px_rgba(19,236,19,0.4)] active:scale-95 transition-all flex items-center justify-center gap-6 disabled:opacity-30 uppercase italic border-8 border-white/20 font-black text-4xl">
+                  {loading ? <Activity className="animate-spin size-12" /> : <Plus size={48} strokeWidth={4} />} SALVA PESO
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      </main>
-
-      {/* Unified Bold Navigation Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-background-dark border-t-8 border-[#13ec13]/20 px-4 py-8 pb-14 flex justify-around items-center z-40 shadow-[0_-20px_60px_rgba(0,0,0,0.2)]">
-        <button onClick={() => handleSetCurrentView('dashboard')} className="flex flex-col items-center text-primary group active:scale-90 transition-all">
-          <span className="material-symbols-outlined text-6xl" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
-          <span className="text-xl font-black mt-2 uppercase tracking-tighter">HOME</span>
-        </button>
-        <button onClick={() => handleSetCurrentView('weight')} className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all">
-          <span className="material-symbols-outlined text-6xl">restaurant_menu</span>
-          <span className="text-xl font-black mt-2 uppercase tracking-tighter">PESO</span>
-        </button>
-        <button className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all">
-          <span className="material-symbols-outlined text-6xl">emoji_events</span>
-          <span className="text-xl font-black mt-2 uppercase tracking-tighter">PREMI</span>
-        </button>
-        <button
-          onClick={() => router.push('/profile')}
-          className="flex flex-col items-center text-[#618961] group active:scale-90 transition-all"
-        >
-          <span className="material-symbols-outlined text-6xl">account_circle</span>
-          <span className="text-xl font-black mt-2 uppercase tracking-tighter">PROFILO</span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ label, value, accent = false }) {
-  return (
-    <div className="bg-[#121c12] border-2 border-white/5 rounded-[2rem] p-6 shadow-lg">
-      <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-2">{label}</p>
-      <p className={cn("text-2xl font-black italic", accent ? "text-[#22c55e]" : "text-white")}>{value}</p>
-    </div>
-  );
-}
-
-function NavItem({ icon, label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex flex-col items-center gap-2 transition-all active:scale-90 group",
-        active ? "text-[#22c55e]" : "text-white/30 hover:text-white/50"
-      )}
-    >
-      <div className={cn(
-        "p-4 rounded-[1.5rem] transition-all",
-        active && "bg-[#22c55e]/10 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
-      )}>
-        {cloneElement(icon, { size: active ? 40 : 36, strokeWidth: active ? 3 : 2 })}
-      </div>
-      <span className="text-xs font-black uppercase tracking-[0.2em]">{label}</span>
-    </button>
+        )
+      }
+    </div >
   );
 }

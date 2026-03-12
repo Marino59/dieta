@@ -9,7 +9,6 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
     const [activeTab, setActiveTab] = useState(initialMode || 'text'); // 'text', 'camera', 'barcode'
 
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [pendingMeal, setPendingMeal] = useState(null);
     const [pendingImage, setPendingImage] = useState(null);
     const [textDescription, setTextDescription] = useState("");
     const [isSaving, setIsSaving] = useState(false);
@@ -25,13 +24,13 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
         }
 
         // Auto-open camera when tab is selected
-        if (activeTab === 'camera' && !pendingMeal && !isAnalyzing) {
+        if (activeTab === 'camera' && !pendingImage && !isAnalyzing) {
             // Small timeout to ensure render
             setTimeout(() => {
                 fileInputRef.current?.click();
             }, 100);
         }
-    }, [activeTab, pendingMeal, isAnalyzing]);
+    }, [activeTab, pendingImage, isAnalyzing]);
 
     const handleFileSelect = async (e) => {
         const file = e.target.files?.[0];
@@ -76,103 +75,44 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
     };
 
     const analyzeImage = async (base64Image) => {
-        // We will immediately return and create a pending meal
-        const finalDate = defaultDate ? new Date(defaultDate) : new Date();
-        const tempMeal = {
-            name: "Analisi AI in corso...",
-            quantity: 0,
-            calories: 0,
-            protein: 0,
-            carbs: 0,
-            fat: 0,
-            status: 'pending',
-            created_at: finalDate,
-            image_path: base64Image
-        };
         setIsAnalyzing(true);
         try {
-            const pendingDoc = await addMeal(tempMeal);
-            if (onMealAdded) onMealAdded(pendingDoc);
-            setIsAnalyzing(false); // Free UI
-
-            // Fire and forget background promise
             const base64Data = base64Image.split(',')[1] || base64Image;
-            setPendingImage(null); // Clear local state immediately to avoid UI blocking
-            analyzeFoodImage(base64Data, profile).then(async (data) => {
-                await updateMeal(pendingDoc.id, {
-                    ...data,
-                    status: 'completed'
-                });
-            }).catch(async (error) => {
-                console.error("AI Background Image Error:", error);
-                await updateMeal(pendingDoc.id, {
-                    name: "Errore AI - Clicca ed inserisci i dati",
-                    status: 'error',
-                    analysis: "Scusa, l'app o l'intelligenza artificiale hanno riscontrato un errore."
-                });
-            });
+            const data = await analyzeFoodImage(base64Data, profile);
+            
+            if (onMealIdentified) {
+                onMealIdentified(data);
+            } else if (onMealAdded) {
+                const finalDoc = await addMeal(data);
+                onMealAdded(finalDoc);
+            }
         } catch (error) {
-            console.error("Firestore error saving pending image meal", error);
-            alert("Impossibile salvare il pasto iniziale, controlla la tua connessione.");
+            console.error("Image analysis failed", error);
+            alert("Errore nell'analisi dell'immagine. Riprova.");
         } finally {
             setIsAnalyzing(false);
+            setPendingImage(null);
         }
     };
 
     const handleTextSubmit = async () => {
         if (!textDescription.trim()) return;
+
         setIsAnalyzing(true);
         try {
-            const finalDateInput = defaultDate ? new Date(defaultDate) : new Date();
-            const desc = textDescription; // Capture it cleanly
-
-            const tempMeal = {
-                name: `Analizzazione... "${desc.substring(0, 15)}..."`,
-                quantity: 0,
-                calories: 0,
-                protein: 0,
-                carbs: 0,
-                fat: 0,
-                status: 'pending',
-                created_at: finalDateInput
-            };
-
-            const pendingDoc = await addMeal(tempMeal);
-            if (onMealAdded) onMealAdded(pendingDoc);
-            setTextDescription("");
-            setIsAnalyzing(false); // Free UI
-
-            // Fire and forget background promise
-            analyzeFoodText(desc, finalDateInput, profile).then(async (data) => {
-                let finalDate = finalDateInput;
-                if (data.date) {
-                    const [y, m, d] = data.date.split('-').map(Number);
-                    finalDate = new Date(finalDate);
-                    finalDate.setFullYear(y, m - 1, d);
-                }
-                if (data.time && /^\d{2}:\d{2}$/.test(data.time)) {
-                    finalDate = new Date(finalDate);
-                    const [hours, minutes] = data.time.split(':').map(Number);
-                    finalDate.setHours(hours, minutes, 0, 0);
-                }
-
-                await updateMeal(pendingDoc.id, {
-                    ...data,
-                    created_at: finalDate,
-                    status: 'completed'
-                });
-            }).catch(async (error) => {
-                console.error("AI Background Text Error:", error);
-                await updateMeal(pendingDoc.id, {
-                    name: "Errore elaborazione AI Testo",
-                    status: 'error',
-                    analysis: error.message || "L'Intelligenza Artificiale non è riuscita a capire questo testo."
-                });
-            });
-
+            const data = await analyzeFoodText(textDescription, new Date(), profile);
+            
+            if (onMealIdentified) {
+                onMealIdentified(data);
+                setTextDescription("");
+            } else if (onMealAdded) {
+                const finalDoc = await addMeal(data);
+                onMealAdded(finalDoc);
+                setTextDescription("");
+            }
         } catch (error) {
-            console.error("Failed handling text submit:", error);
-            alert(`Errore AI: ${error.message || 'Riprova con una descrizione più semplice'}`);
+            console.error("Text analysis failed", error);
+            alert("Errore nell'analisi del testo. Riprova.");
         } finally {
             setIsAnalyzing(false);
         }
@@ -221,41 +161,41 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
             />
 
             {/* Top Navigation Tabs */}
-            <div className="grid grid-cols-3 w-full gap-6 mb-12">
+            <div className="grid grid-cols-3 w-full gap-2 mb-6 px-2">
                 <button
                     onClick={() => setActiveTab('camera')}
-                    className={`aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all ${activeTab === 'camera' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
+                    className={`aspect-square rounded-[2rem] flex flex-col items-center justify-center transition-all ${activeTab === 'camera' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
                     style={{
                         background: activeTab === 'camera' ? 'linear-gradient(135deg, #13ec13 0%, #0ea50e 100%)' : '',
                         color: activeTab === 'camera' ? 'white' : '#618961'
                     }}
                 >
-                    <span className="text-[5rem] drop-shadow-lg mb-2">📸</span>
-                    <span className="text-xl font-black tracking-tighter uppercase mt-2">Foto</span>
+                    <span className="text-[4rem] drop-shadow-xl mb-1">📸</span>
+                    <span className="text-2xl font-[900] tracking-tighter uppercase">Foto</span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab('text')}
-                    className={`aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all ${activeTab === 'text' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
+                    className={`aspect-square rounded-[2rem] flex flex-col items-center justify-center transition-all ${activeTab === 'text' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
                     style={{
                         background: activeTab === 'text' ? 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)' : '',
                         color: activeTab === 'text' ? 'white' : '#1e40af'
                     }}
                 >
-                    <span className="text-[5rem] drop-shadow-lg mb-2">✍️</span>
-                    <span className="text-xl font-black tracking-tighter uppercase mt-2">Testo</span>
+                    <span className="text-[4rem] drop-shadow-xl mb-1">✍️</span>
+                    <span className="text-2xl font-[900] tracking-tighter uppercase">Testo</span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab('barcode')}
-                    className={`aspect-square rounded-[2.5rem] flex flex-col items-center justify-center transition-all ${activeTab === 'barcode' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
+                    className={`aspect-square rounded-[2rem] flex flex-col items-center justify-center transition-all ${activeTab === 'barcode' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
                     style={{
                         background: activeTab === 'barcode' ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' : '',
                         color: activeTab === 'barcode' ? 'white' : '#92400e'
                     }}
                 >
-                    <span className="text-[5rem] drop-shadow-lg mb-2">🤳</span>
-                    <span className="text-xl font-black tracking-tighter uppercase mt-2">Codice</span>
+                    <span className="text-[4rem] drop-shadow-xl mb-1">🤳</span>
+                    <span className="text-2xl font-[900] tracking-tighter uppercase">Codice</span>
                 </button>
             </div>
 
@@ -280,29 +220,29 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
                             onClick={() => fileInputRef.current?.click()}
                             className="w-full aspect-[4/3] rounded-[3.5rem] flex flex-col items-center justify-center border-4 border-dashed border-green-500/30 bg-green-500/10 hover:bg-green-500/20 active:scale-95 transition-all group shadow-xl"
                         >
-                            <div className="p-10 rounded-full bg-gradient-to-br from-[#13ec13] to-[#0ea50e] shadow-2xl shadow-green-500/40 mb-8 group-hover:scale-110 transition-transform duration-500 border-4 border-white/40">
-                                <Camera size={80} color="white" strokeWidth={2.5} />
+                            <div className="p-12 rounded-full bg-gradient-to-br from-[#13ec13] to-[#0ea50e] shadow-2xl shadow-green-500/40 mb-10 group-hover:scale-110 transition-transform duration-500 border-8 border-white/40">
+                                <Camera size={120} color="white" strokeWidth={3} />
                             </div>
-                            <span className="text-4xl font-black text-[#111811] italic">SCATTA ORA</span>
-                            <span className="text-xl text-[#618961] mt-4 font-bold uppercase tracking-widest opacity-60">CARICA DALLA GALLERIA</span>
+                            <span className="text-7xl font-[900] text-[#111811] tracking-tighter">SCATTA ORA</span>
+                            <span className="text-3xl text-[#618961] mt-8 font-black uppercase tracking-widest opacity-80">CARICA DALLA GALLERIA</span>
                         </button>
                     </div>
                 )}
 
                 {/* TEXT MODE */}
                 {activeTab === 'text' && (
-                    <div className="flex flex-col w-full gap-8">
+                    <div className="flex flex-col w-full gap-6">
                         <textarea
                             autoFocus
-                            placeholder="Cosa hai mangiato?&#10;Es: 2 uova strapazzate con pane tostato..."
-                            className="w-full h-80 bg-white dark:bg-slate-900 border-4 border-blue-500/30 rounded-[3rem] p-10 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors resize-none shadow-2xl text-4xl font-bold leading-relaxed"
+                            placeholder="Cosa hai mangiato?&#10;Es: 2 uova strapazzate..."
+                            className="w-full h-[40rem] bg-white dark:bg-slate-900 border-2 border-blue-500/30 rounded-2xl p-4 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors resize-none shadow-xl text-6xl font-bold leading-snug"
                             value={textDescription}
                             onChange={(e) => setTextDescription(e.target.value)}
                         />
                         <button
                             onClick={handleTextSubmit}
                             disabled={!textDescription.trim()}
-                            className="w-full h-28 rounded-[2.5rem] font-black text-4xl tracking-tighter shadow-2xl shadow-blue-500/30 active:scale-95 transition-all text-white disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 border-4 border-white/20 uppercase"
+                            className="w-full h-24 rounded-2xl font-[900] text-3xl tracking-tighter shadow-xl shadow-blue-500/20 active:scale-95 transition-all text-white disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 border-4 border-white/20 uppercase"
                         >
                             🚀 ANALIZZA PASTO
                         </button>
@@ -318,7 +258,7 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
                         />
                         <div className="absolute inset-0 pointer-events-none border-[12px] border-amber-500/50 rounded-[4rem] z-10"></div>
                         <div className="absolute bottom-10 left-0 right-0 text-center z-20">
-                            <span className="bg-amber-500/90 text-white px-8 py-4 rounded-3xl text-2xl font-black backdrop-blur-md shadow-xl border-2 border-white/20 uppercase tracking-tighter">
+                            <span className="bg-amber-500/90 text-white px-12 py-6 rounded-[2rem] text-4xl font-[900] backdrop-blur-md shadow-xl border-4 border-white/20 uppercase tracking-tighter">
                                 Inquadra il codice
                             </span>
                         </div>
@@ -328,18 +268,7 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
 
 
 
-            {/* Confirmation Modal */}
-            {
-                pendingMeal && (
-                    <ConfirmMealModal
-                        mealData={pendingMeal}
-                        onConfirm={handleConfirmMeal}
-                        onCancel={() => { setPendingMeal(null); setPendingImage(null); }}
-                        isLoading={isSaving}
-                        defaultDate={defaultDate}
-                    />
-                )
-            }
+
         </div >
     );
 }

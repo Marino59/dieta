@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import "./globals.css";
 import { AuthContextProvider } from "@/lib/auth-context";
+import BottomNav from "@/components/BottomNav";
 
 export const metadata = {
   title: "Dashboard Dieta",
@@ -25,9 +27,14 @@ export default function RootLayout({ children }) {
       </head>
       <body className="antialiased min-h-screen bg-background-light dark:bg-background-dark">
         <AuthContextProvider>
-          <main className="w-full min-h-screen relative overflow-x-hidden">
-            {children}
+          <main className="w-full min-h-screen relative overflow-x-hidden pb-40">
+            <Suspense fallback={<div className="p-10 text-center font-black">Caricamento...</div>}>
+              {children}
+            </Suspense>
           </main>
+          <Suspense fallback={null}>
+            <BottomNav />
+          </Suspense>
         </AuthContextProvider>
       </body>
     </html>

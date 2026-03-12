@@ -12,11 +12,23 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
 
     // Initialize date logic
     const getInitialDate = () => {
-        if (mealData.date) return new Date(mealData.date);
+        const now = new Date();
+        if (mealData.created_at) {
+            const d = new Date(mealData.created_at);
+            // If the date comes from AI or picker with zeroed time (often 01:00 local)
+            // AND it's for today, we prioritize "Now" for better UX.
+            if (d.getHours() === 1 && d.getMinutes() === 0 && d.toDateString() === now.toDateString()) {
+                d.setHours(now.getHours(), now.getMinutes());
+            }
+            return d;
+        }
         const base = defaultDate ? new Date(defaultDate) : new Date();
-        if (defaultDate) {
-            const now = new Date();
+        // If provided date has zeroed time components, set to current time
+        if (base.getHours() === 1 && base.getMinutes() === 0 && base.toDateString() === now.toDateString()) {
             base.setHours(now.getHours(), now.getMinutes());
+        } else if (!defaultDate) {
+            // If no date provided at all, use absolute Now
+            return now;
         }
         return base;
     };
@@ -64,7 +76,7 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
             carbs: scaleMacro(mealData.carbs),
             fat: scaleMacro(mealData.fat),
             analysis,
-            date: finalDate
+            created_at: finalDate
         });
     };
 
@@ -86,10 +98,10 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
 
     // The actual modal JSX
     return (
-        <div className="fixed inset-0 z-[99999] bg-slate-950 flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[99999] bg-slate-950 flex flex-col h-[100dvh] animate-in zoom-in-95 duration-200">
 
             {/* Header */}
-            <div className="p-8 border-b-4 border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
+            <div className="p-10 border-b-8 border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
                 <button
                     onClick={onCancel}
                     className="w-20 h-20 bg-slate-800 rounded-2xl text-slate-400 hover:text-white transition active:scale-95 flex items-center justify-center"
@@ -101,8 +113,8 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                <div className="flex flex-col gap-12 max-w-4xl mx-auto">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                <div className="flex flex-col gap-12 max-w-5xl mx-auto">
 
                     {/* Main Title & Quantity */}
                     {/* Main Title & Quantity */}
@@ -110,7 +122,7 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
                         <textarea
                             value={mealData.name}
                             readOnly
-                            className="w-full bg-transparent text-6xl sm:text-8xl font-black text-white text-center outline-none resize-none overflow-hidden uppercase tracking-tighter"
+                            className="w-full bg-transparent text-7xl sm:text-9xl font-black text-white text-center outline-none resize-none overflow-hidden uppercase tracking-tighter"
                             rows={mealData.name.length > 15 ? 3 : 2}
                             style={{ lineHeight: '1.0' }}
                         />
@@ -124,8 +136,8 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
                             </button>
 
                             <div className="flex flex-col items-center min-w-[220px]">
-                                <span className="text-[10rem] sm:text-[12rem] font-black text-blue-400 tracking-tighter leading-none shadow-blue-500/10 drop-shadow-2xl">{quantity}</span>
-                                <span className="text-3xl text-slate-500 font-black uppercase tracking-[0.4em] mt-4">GRAMMI</span>
+                                <span className="text-[12rem] sm:text-[14rem] font-black text-blue-400 tracking-tighter leading-none shadow-blue-500/10 drop-shadow-2xl">{quantity}</span>
+                                <span className="text-4xl text-slate-500 font-black uppercase tracking-[0.4em] mt-4">GRAMMI</span>
                             </div>
 
                             <button
@@ -145,9 +157,9 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
                             return (
                                 <>
                                     <MacroBox label="CALORIE" val={scale(mealData.calories)} unit="kcal" color="text-white" border="bg-slate-900 border-slate-800" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
-                                    <MacroBox label="PROTEINE" val={scale(mealData.protein)} unit="g" color="text-blue-400" border="bg-blue-950/30 border-blue-900/50" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
-                                    <MacroBox label="CARB." val={scale(mealData.carbs)} unit="g" color="text-emerald-400" border="bg-emerald-950/30 border-emerald-900/50" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
-                                    <MacroBox label="GRASSI" val={scale(mealData.fat)} unit="g" color="text-amber-400" border="bg-amber-950/30 border-amber-900/50" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
+                                    <MacroBox label="PROTEINE" val={scale(mealData.protein)} unit="g" color="text-blue-400" border="bg-blue-950/30 border-blue-500/30" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
+                                    <MacroBox label="CARB." val={scale(mealData.carbs)} unit="g" color="text-emerald-400" border="bg-emerald-950/30 border-emerald-500/30" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
+                                    <MacroBox label="GRASSI" val={scale(mealData.fat)} unit="g" color="text-amber-400" border="bg-amber-950/30 border-amber-500/30" h="h-64 sm:h-72" size="text-8xl sm:text-9xl" />
                                 </>
                             );
                         })()}
@@ -155,40 +167,40 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
 
                     {/* AI ANALYSIS DISPLAY */}
                     {analysis && (
-                        <div className={`border-4 rounded-[3rem] p-8 mt-4 shadow-xl ${analysis.includes('⚠️') ? 'bg-red-500/10 border-red-500/50' : 'bg-blue-500/10 border-blue-500/30'}`}>
-                            <h3 className={`font-black text-4xl mb-4 italic uppercase tracking-wider flex items-center gap-4 ${analysis.includes('⚠️') ? 'text-red-400' : 'text-blue-400'}`}>
+                        <div className={`border-8 rounded-[3.5rem] p-10 mt-6 shadow-2xl ${analysis.includes('⚠️') ? 'bg-red-500/10 border-red-500/50' : 'bg-blue-500/10 border-blue-500/30'}`}>
+                            <h3 className={`font-black text-5xl mb-6 italic uppercase tracking-wider flex items-center gap-4 ${analysis.includes('⚠️') ? 'text-red-400' : 'text-blue-400'}`}>
                                 <span>{analysis.includes('⚠️') ? '⚠️' : '💡'}</span>
                                 {analysis.includes('⚠️') ? "ATTENZIONE ALLA TUA DIETA" : "PARERE DELL'AI"}
                             </h3>
-                            <p className="text-white text-3xl font-bold leading-relaxed">{analysis}</p>
+                            <p className="text-white text-4xl font-bold leading-relaxed">{analysis}</p>
                         </div>
                     )}
 
                     {/* DateTime Section - Enhanced with ORA button */}
                     <div className="flex flex-col gap-6">
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="bg-slate-900 p-8 rounded-[2.5rem] border-2 border-slate-800 flex flex-col gap-4 shadow-inner">
-                                <span className="text-xl font-black text-slate-500 tracking-[0.3em] text-center uppercase italic">GIORNO</span>
+                        <div className="flex flex-col gap-6">
+                            <div className="bg-slate-900 p-10 rounded-[3rem] border-4 border-slate-800 flex flex-col gap-6 shadow-inner w-full transition hover:border-slate-700">
+                                <span className="text-2xl font-black text-slate-500 tracking-[0.3em] text-center uppercase italic">GIORNO</span>
                                 <input
                                     type="date"
                                     value={selectedDateStr}
                                     onChange={e => setSelectedDateStr(e.target.value)}
-                                    className="bg-transparent text-white text-5xl font-black outline-none w-full text-center"
+                                    className="bg-transparent text-white text-6xl font-black outline-none w-full text-center"
                                 />
                             </div>
-                            <div className="bg-slate-900 p-8 rounded-[2.5rem] border-2 border-slate-800 flex flex-col gap-4 shadow-inner">
-                                <span className="text-xl font-black text-slate-500 tracking-[0.3em] text-center uppercase italic">ORA</span>
+                            <div className="bg-slate-900 p-10 rounded-[3rem] border-4 border-slate-800 flex flex-col gap-6 shadow-inner w-full transition hover:border-slate-700">
+                                <span className="text-2xl font-black text-slate-500 tracking-[0.3em] text-center uppercase italic">ORA</span>
                                 <input
                                     type="time"
                                     value={selectedTimeStr}
                                     onChange={e => setSelectedTimeStr(e.target.value)}
-                                    className="bg-transparent text-white text-5xl font-black outline-none w-full text-center"
+                                    className="bg-transparent text-white text-6xl font-black outline-none w-full text-center"
                                 />
                             </div>
                         </div>
                         <button
                             onClick={setNow}
-                            className="bg-blue-600/10 text-blue-400 border-4 border-blue-500/20 p-10 rounded-[2.5rem] font-black text-4xl flex items-center justify-center gap-6 active:scale-95 transition-all mb-12 shadow-2xl"
+                            className="bg-blue-600/10 text-blue-400 border-4 border-blue-500/20 p-10 rounded-[2.5rem] font-black text-4xl flex items-center justify-center gap-6 active:scale-95 transition-all mb-12 shadow-2xl w-full"
                         >
                             <RefreshCw size={48} strokeWidth={3} />
                             IMPOSTA ORA ORA
@@ -216,10 +228,10 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
 
 function MacroBox({ label, val, unit, color, border, h, size }) {
     return (
-        <div className={`flex flex-col items-center justify-center ${h} rounded-[3rem] border-4 ${border} transition hover:scale-[1.02] shadow-2xl`}>
+        <div className={`flex flex-col items-center justify-center ${h} rounded-[3.5rem] border-8 ${border} transition hover:scale-[1.02] shadow-2xl`}>
             <span className={`leading-none font-black ${color} ${size} drop-shadow-lg`}>{val}</span>
-            <span className={`text-3xl font-black opacity-80 mt-4 tracking-widest ${color}`}>{unit}</span>
-            <span className="text-xl font-black text-slate-500 tracking-[0.4em] mt-6 uppercase italic">{label}</span>
+            <span className={`text-4xl font-black opacity-80 mt-4 tracking-widest ${color}`}>{unit}</span>
+            <span className="text-2xl font-black text-slate-500 tracking-[0.4em] mt-6 uppercase italic">{label}</span>
         </div>
     );
 }

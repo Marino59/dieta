@@ -11,11 +11,12 @@ const apiKey = apiKeyMatch ? apiKeyMatch[1].trim().replace(/^"|"$/g, '') : null;
 process.env.NEXT_PUBLIC_GEMINI_API_KEY = apiKey;
 
 const genAI = new GoogleGenerativeAI(apiKey);
+console.log("Using API Key starting with:", apiKey ? apiKey.substring(0, 5) : "null");
 
 async function test(description) {
     console.log(`\n--- Testing: "${description}" ---`);
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
         const prompt = `
         Analizza questa descrizione di cibo: "${description}"

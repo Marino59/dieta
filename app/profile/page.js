@@ -31,6 +31,8 @@ export default function ProfilePage() {
     const [sex, setSex] = useState('male');
     const [activityLevel, setActivityLevel] = useState(1.55);
     const [goalDescription, setGoalDescription] = useState('');
+    const [targetWeight, setTargetWeight] = useState('');
+    const [targetWeeks, setTargetWeeks] = useState('');
 
     // Calculated targets
     const [targetCalories, setTargetCalories] = useState(2000);
@@ -72,6 +74,8 @@ export default function ProfilePage() {
                 setSex(profile.sex || 'male');
                 setActivityLevel(profile.activityLevel || 1.55);
                 setGoalDescription(profile.goalDescription || '');
+                setTargetWeight(profile.targetWeight || '');
+                setTargetWeeks(profile.targetWeeks || '');
                 setTargetCalories(profile.targetCalories || 2000);
                 setProtein(profile.protein || 150);
                 setCarbs(profile.carbs || 200);
@@ -124,6 +128,8 @@ export default function ProfilePage() {
                 sex,
                 activityLevel,
                 goalDescription,
+                targetWeight: targetWeight ? parseFloat(targetWeight) : null,
+                targetWeeks: targetWeeks ? parseInt(targetWeeks) : null,
                 targetCalories,
                 protein,
                 carbs,
@@ -259,36 +265,35 @@ export default function ProfilePage() {
                     />
                 </section>
 
-                {/* AI GOAL DESCRIPTION */}
+                {/* TARGET SECTION */}
                 <section className="bg-white dark:bg-[#1a2e1a] rounded-[3rem] p-10 shadow-xl border-4 border-[#dbe6db] dark:border-white/10 space-y-8">
                     <div className="flex items-center gap-4 mb-2 text-primary">
                         <span className="material-symbols-outlined text-5xl">auto_awesome</span>
-                        <h2 className="font-black text-3xl uppercase tracking-widest italic">Obiettivo AI</h2>
+                        <h2 className="font-black text-3xl uppercase tracking-widest italic">Imposta Obiettivo</h2>
                     </div>
 
-                    <p className="text-xl font-bold text-[#618961]">Cosa vuoi ottenere? (es: "Perdere 5kg per l'estate")</p>
-
-                    <textarea
-                        value={goalDescription}
-                        onChange={(e) => setGoalDescription(e.target.value)}
-                        placeholder="Esempio: Vorrei calare di 5 chili..."
-                        className="w-full bg-[#f6f8f6] dark:bg-black/20 border-4 border-[#dbe6db] dark:border-white/10 rounded-[2.5rem] px-8 py-8 text-3xl font-bold focus:border-primary outline-none transition-all h-64 resize-none"
-                    />
-
-                    <button
-                        onClick={handleAICalculate}
-                        disabled={calculatingAI || !goalDescription}
-                        className="w-full h-24 bg-black dark:bg-white text-white dark:text-black rounded-[2rem] font-black text-2xl flex items-center justify-center gap-4 disabled:opacity-50 active:scale-95 transition-transform shadow-xl"
-                    >
-                        {calculatingAI ? (
-                            <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent"></div>
-                        ) : (
-                            <>
-                                <span className="material-symbols-outlined text-4xl">psychology</span>
-                                CALCOLA OBIETTIVI AI
-                            </>
-                        )}
-                    </button>
+                    <div className="grid grid-cols-2 gap-8 mb-4">
+                        <div className="space-y-4">
+                            <label className="text-xl font-black text-[#618961] uppercase tracking-tighter block ml-2">Peso Obiettivo (kg)</label>
+                            <input
+                                type="number"
+                                value={targetWeight}
+                                onChange={(e) => setTargetWeight(e.target.value)}
+                                className="w-full h-24 bg-[#f6f8f6] dark:bg-black/20 border-4 border-[#dbe6db] dark:border-white/10 rounded-3xl px-8 text-4xl font-black focus:border-primary outline-none transition-all"
+                                placeholder="80"
+                            />
+                        </div>
+                        <div className="space-y-4">
+                            <label className="text-xl font-black text-[#618961] uppercase tracking-tighter block ml-2">Settimane</label>
+                            <input
+                                type="number"
+                                value={targetWeeks}
+                                onChange={(e) => setTargetWeeks(e.target.value)}
+                                className="w-full h-24 bg-[#f6f8f6] dark:bg-black/20 border-4 border-[#dbe6db] dark:border-white/10 rounded-3xl px-8 text-4xl font-black focus:border-primary outline-none transition-all"
+                                placeholder="12"
+                            />
+                        </div>
+                    </div>
                 </section>
 
                 {/* Results Card */}
