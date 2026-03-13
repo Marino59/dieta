@@ -659,11 +659,11 @@ export default function Home() {
                 </motion.div>
 
                 <section className="space-y-12">
-                  <div className="flex items-center justify-between px-2">
-                    <h2 className="text-3xl font-black italic uppercase tracking-tighter text-[#111811] dark:text-white">Andamento <span className="text-xs opacity-20 not-italic ml-2">({chartData.length} pts)</span></h2>
+                  <div className="flex flex-col gap-6 mb-10 px-6">
+
                     <div className="flex bg-slate-200/50 dark:bg-white/5 p-2 rounded-2xl border border-slate-300/50 dark:border-white/5">
                       {['SETTIMANA', 'ANNO'].map((period) => (
-                        <button key={period} onClick={() => setWeightPeriod(period.substring(0, 4).toUpperCase())} className={cn("px-8 py-4 text-xl font-black rounded-xl transition-all uppercase tracking-tighter", weightPeriod === period.substring(0, 4).toUpperCase() ? "bg-primary text-[#050a05] shadow-md" : "text-slate-500 dark:text-white/30 hover:text-slate-800 dark:hover:text-white/60")}>
+                        <button key={period} onClick={() => setWeightPeriod(period.substring(0, 4).toUpperCase())} className={cn("flex-1 py-4 text-2xl font-black rounded-xl transition-all uppercase tracking-tighter", weightPeriod === period.substring(0, 4).toUpperCase() ? "bg-primary text-[#050a05] shadow-md" : "text-slate-500 dark:text-white/30 hover:text-slate-800 dark:hover:text-white/60")}>
                           {period}
                         </button>
                       ))}
