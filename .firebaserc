@@ -1,5 +1,7 @@
 {
-  "projects": {},
+  "projects": {
+    "default": "sentieri-cortina-web-app"
+  },
   "targets": {
     "sentieri-cortina-web-app": {
       "hosting": {

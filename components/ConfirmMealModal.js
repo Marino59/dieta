@@ -122,9 +122,9 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
                         <textarea
                             value={mealData.name}
                             readOnly
-                            className="w-full bg-transparent text-7xl sm:text-9xl font-black text-white text-center outline-none resize-none overflow-hidden uppercase tracking-tighter"
-                            rows={mealData.name.length > 15 ? 3 : 2}
-                            style={{ lineHeight: '1.0' }}
+                            className="w-full bg-transparent text-3xl sm:text-4xl font-black text-white text-center outline-none resize-none overflow-y-auto uppercase tracking-tighter"
+                            rows={4}
+                            style={{ lineHeight: '1.2' }}
                         />
 
                         <div className="flex items-center justify-center gap-8 sm:gap-12">

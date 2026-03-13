@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef, cloneElement } from 'react';
+import React, { useState, useEffect, useRef, cloneElement, useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Trash2, TrendingUp, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity, Loader2, AlertTriangle, User } from 'lucide-react';
+import { Trash2, TrendingUp, TrendingDown, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity, Loader2, AlertTriangle, User } from 'lucide-react';
 import { getMeals, deleteMeal, updateMeal, addMeal, getUserProfile, getWeights, addWeight, deleteWeight, subscribeToMeals } from '@/lib/firestore';
 import { getDailyCoachAdvice, getHungryAdvice, parseWeightGoal } from "@/lib/ai";
 import ConfirmMealModal from '@/components/ConfirmMealModal';
@@ -230,11 +230,11 @@ export default function Home() {
     }
   };
 
-  // Calculations
-  const totalCalories = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
-  const totalProtein = meals.reduce((sum, m) => sum + (m.protein || 0), 0);
-  const totalCarbs = meals.reduce((sum, m) => sum + (m.carbs || 0), 0);
-  const totalFat = meals.reduce((sum, m) => sum + (m.fat || 0), 0);
+  // Calculations - Memoized to prevent unnecessary re-renders
+  const totalCalories = useMemo(() => meals.reduce((sum, m) => sum + (m.calories || 0), 0), [meals]);
+  const totalProtein = useMemo(() => meals.reduce((sum, m) => sum + (m.protein || 0), 0), [meals]);
+  const totalCarbs = useMemo(() => meals.reduce((sum, m) => sum + (m.carbs || 0), 0), [meals]);
+  const totalFat = useMemo(() => meals.reduce((sum, m) => sum + (m.fat || 0), 0), [meals]);
 
   const targetCalories = profile?.targetCalories || 2400;
   const targetProtein = profile?.targetProtein || 150;
@@ -242,52 +242,53 @@ export default function Home() {
   const targetFat = profile?.targetFat || 70;
   const targetWeight = profile?.targetWeight || 0;
 
-  const proteinPercentage = Math.min((totalProtein / targetProtein) * 100, 100);
-  const fatPercentage = Math.min((totalFat / targetFat) * 100, 100);
-  const carbsPercentage = Math.min((totalCarbs / targetCarbs) * 100, 100);
+  const proteinPercentage = useMemo(() => Math.min((totalProtein / targetProtein) * 100, 100), [totalProtein, targetProtein]);
+  const fatPercentage = useMemo(() => Math.min((totalFat / targetFat) * 100, 100), [totalFat, targetFat]);
+  const carbsPercentage = useMemo(() => Math.min((totalCarbs / targetCarbs) * 100, 100), [totalCarbs, targetCarbs]);
 
   const radius = 135;
   const circumference = 2 * Math.PI * radius;
-  const dashPercentage = Math.min((totalCalories / targetCalories) * circumference, circumference);
+  const dashPercentage = useMemo(() => Math.min((totalCalories / targetCalories) * circumference, circumference), [totalCalories, targetCalories, circumference]);
   const strokeDashoffset = circumference - dashPercentage;
 
-  // Weight Data Processing
+  // Weight Data Processing - Memoized to prevent infinite loop with Recharts
   const getWeightTime = (w) => w.created_at ? new Date(w.created_at).getTime() : w.timestamp;
-  const sortedWeights = [...weights].sort((a, b) => getWeightTime(a) - getWeightTime(b));
-  const currentWeight = sortedWeights.length > 0 ? sortedWeights[sortedWeights.length - 1].weight : 0;
-  const initialWeight = sortedWeights.length > 0 ? sortedWeights[0].weight : 0;
-  const weightLost = initialWeight > 0 ? (initialWeight - currentWeight).toFixed(1) : 0;
-  const weightMissing = targetWeight > 0 ? (currentWeight - targetWeight).toFixed(1) : 0;
+  
+  const sortedWeights = useMemo(() => {
+    return [...weights].sort((a, b) => getWeightTime(a) - getWeightTime(b));
+  }, [weights]);
 
-  const getWeeklyDelta = () => {
+  const currentWeight = useMemo(() => sortedWeights.length > 0 ? sortedWeights[sortedWeights.length - 1].weight : 0, [sortedWeights]);
+  const initialWeight = useMemo(() => sortedWeights.length > 0 ? sortedWeights[0].weight : 0, [sortedWeights]);
+  
+  const weeklyDelta = useMemo(() => {
     if (sortedWeights.length < 2) return 0;
     const now = Date.now();
     const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
     const weightsThisWeek = sortedWeights.filter(w => getWeightTime(w) >= oneWeekAgo);
     if (weightsThisWeek.length < 2) return 0;
     return (weightsThisWeek[weightsThisWeek.length - 1].weight - weightsThisWeek[0].weight).toFixed(1);
-  };
-  const weeklyDelta = getWeeklyDelta();
+  }, [sortedWeights]);
 
-  const filterWeightsByPeriod = () => {
+  const chartData = useMemo(() => {
+    if (!isMounted) return [];
+    
     const now = new Date();
     let startDate = new Date();
-    if (weightPeriod === 'GIOR') startDate.setDate(now.getDate() - 1);
-    else if (weightPeriod === 'SETT') startDate.setDate(now.getDate() - 7);
-    else if (weightPeriod === 'ANNO') startDate.setFullYear(now.getFullYear() - 1);
-    else startDate.setDate(now.getDate() - 7); // Default to week
+    if (weightPeriod === 'SETT') {
+      startDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    } else {
+      startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    }
 
     const filtered = sortedWeights.filter(w => new Date(getWeightTime(w)) >= startDate);
-    console.log("Filtered weights for period", weightPeriod, filtered.length);
-    return filtered;
-  };
-
-  const chartData = filterWeightsByPeriod().map(w => ({
-    day: new Date(getWeightTime(w)).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }),
-    weight: w.weight,
-    target: targetWeight > 0 ? targetWeight : null,
-    isCurrent: w.id === sortedWeights[sortedWeights.length - 1]?.id
-  }));
+    
+    return filtered.map(w => ({
+      day: new Date(getWeightTime(w)).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }),
+      weight: parseFloat(w.weight),
+      fullDate: new Date(getWeightTime(w)).toLocaleDateString('it-IT')
+    }));
+  }, [sortedWeights, weightPeriod, isMounted]);
 
   const maxWeight = Math.max(...chartData.map(d => d.weight), targetWeight) || 100;
 
@@ -611,23 +612,71 @@ export default function Home() {
             onAnimationStart={(def) => { if (def === 'exit') setWeightViewReady(false); }}
             className="w-full flex flex-col"
           >
-            <div className="w-full max-w-lg mx-auto">
+            <div className="w-full">
               <header className="flex items-center justify-between px-5 py-6 sticky top-1 bg-[#050a05]/80 backdrop-blur-3xl z-30 border-b border-white/5">
                 <button onClick={() => handleSwipe('right')} className="size-10 rounded-xl bg-white/5 flex items-center justify-center active:scale-90 border-2 border-white/10 shadow-inner group"><ChevronLeft size={48} className="text-primary group-hover:-translate-x-1 transition-transform" /></button>
-                <h1 className="text-5xl font-black italic uppercase tracking-tighter text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">PESO</h1>
+                <h1 className="text-5xl font-black italic uppercase tracking-tighter text-amber-500 drop-shadow-[0_0_15px_rgba(245,158,11,0.3)]">PESO</h1>
                 <div className="size-10" />
               </header>
 
               <main className="flex-1 px-5 space-y-10 py-6">
-                <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#122412] to-[#050a05] backdrop-blur-3xl border border-primary/30 rounded-[3rem] p-10 text-center shadow-[0_20px_60px_rgba(34,197,94,0.15)] relative overflow-hidden group">
-                  <div className="absolute -top-10 -right-10 opacity-10 scale-150 rotate-12 transition-transform duration-1000 group-hover:rotate-0 group-hover:scale-125"><TrendingUp size={150} className="text-primary" /></div>
-                  <p className="text-white/60 text-sm font-black uppercase tracking-[0.4em] mb-4 italic">Situazione Attuale</p>
-                  <div className="flex items-baseline justify-center gap-2 font-black italic">
-                    <span className="text-8xl text-transparent bg-clip-text bg-gradient-to-r from-primary to-green-300 drop-shadow-[0_0_20px_rgba(19,236,19,0.4)] tracking-tighter">{currentWeight || "--.-"}</span>
-                    <span className="text-4xl text-primary/70 uppercase">kg</span>
+                <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#241d12] to-[#0a0f0a] backdrop-blur-3xl border border-amber-500/30 rounded-[3rem] p-8 shadow-[0_20px_60px_rgba(245,158,11,0.15)] relative overflow-hidden group">
+                  <div className="absolute -top-10 -right-10 opacity-10 scale-150 rotate-12 transition-transform duration-1000 group-hover:rotate-0 group-hover:scale-125"><TrendingUp size={150} className="text-amber-500" /></div>
+                  
+                  <div className="grid grid-cols-2 gap-8 mb-8">
+                    <div className="text-center p-6 bg-white/5 rounded-3xl border border-white/10">
+                      <p className="text-amber-500/80 text-xl font-black uppercase tracking-[0.3em] mb-2 italic">Iniziale</p>
+                      <div className="flex items-baseline justify-center gap-1 font-black italic">
+                        <span className="text-4xl text-white tracking-tighter">{isMounted ? (initialWeight || "--.-") : "--.-"}</span>
+                        <span className="text-sm text-white/40 uppercase">kg</span>
+                      </div>
+                    </div>
+                    <div className="text-center p-6 bg-amber-500/10 rounded-3xl border border-amber-500/20">
+                      <p className="text-amber-500 text-xl font-black uppercase tracking-[0.3em] mb-2 italic">Persi</p>
+                      <div className="flex items-baseline justify-center gap-1 font-black italic">
+                        <span className="text-4xl text-amber-500 tracking-tighter">{(initialWeight - currentWeight).toFixed(1)}</span>
+                        <span className="text-sm text-amber-500/60 uppercase">kg</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className={cn("mt-8 inline-flex items-center gap-3 px-6 py-4 rounded-xl text-sm font-black italic uppercase tracking-wider backdrop-blur-lg shadow-inner transition-all", weeklyDelta <= 0 ? "bg-primary/10 text-primary border border-primary/20" : "bg-red-500/10 text-red-500 border border-red-500/20")}>
-                    <TrendingUp className={cn("size-6", weeklyDelta > 0 && "rotate-180")} />
+
+                  <div className="flex flex-col items-center gap-6">
+                    <div className="text-center">
+                      <p className="text-amber-500/80 text-xl font-black uppercase tracking-[0.4em] mb-4 italic text-amber-500/60">Peso Attuale</p>
+                      <div className="flex items-baseline justify-center gap-2 font-black italic">
+                        <span className="text-7xl text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500 drop-shadow-[0_0_20px_rgba(245,158,11,0.4)] tracking-tighter">{isMounted ? (currentWeight || "--.-") : "--.-"}</span>
+                        <span className="text-5xl text-primary/70 uppercase">kg</span>
+                      </div>
+                    </div>
+                    
+                    <div className="w-full h-px bg-white/10" />
+                    
+                    <div className="text-center">
+                      <p className="text-white/40 text-xl font-black uppercase tracking-[0.3em] mb-4 italic text-amber-500/60">Obiettivo Target</p>
+                      <div className="flex items-center justify-center gap-4">
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={targetWeight || ""}
+                          onChange={async (e) => {
+                            const val = parseFloat(e.target.value);
+                            const { saveUserProfile } = await import('@/lib/firestore');
+                            await saveUserProfile({ ...profile, targetWeight: val });
+                          }}
+                          className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-4xl font-black text-amber-500 w-48 text-center outline-none focus:border-amber-500/50"
+                          placeholder="--"
+                        />
+                        <span className="text-2xl text-white/20 font-bold uppercase italic">kg</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={cn("mt-8 w-full flex items-center justify-center gap-4 px-6 py-8 rounded-2xl text-xl font-black italic uppercase tracking-wider backdrop-blur-lg shadow-inner transition-all", weeklyDelta <= 0 ? "bg-primary/10 text-primary border border-primary/20" : "bg-red-500/10 text-red-500 border border-red-500/20")}>
+                    {weeklyDelta < 0 ? (
+                      <TrendingDown className="size-8" />
+                    ) : (
+                      <TrendingUp className={cn("size-8", weeklyDelta === 0 && "opacity-50")} />
+                    )}
                     <span>{weeklyDelta > 0 ? "+" : ""}{weeklyDelta} KG QUESTA SETTIMANA</span>
                   </div>
                 </motion.div>
@@ -646,24 +695,13 @@ export default function Home() {
                   </button>
                 </div>
 
-                <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} className="bg-white dark:bg-[#121c12]/50 backdrop-blur-2xl border border-primary/20 dark:border-white/10 rounded-[2rem] p-8 flex items-center justify-between shadow-xl">
-                  <div className="flex items-center gap-6">
-                    <div className="size-16 rounded-2xl bg-red-500/20 flex items-center justify-center border border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
-                      <div className="size-4 rounded-full bg-red-500 shadow-[0_0_15px_rgba(239,68,68,1)] animate-pulse" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-black text-slate-500 dark:text-white/40 uppercase tracking-[0.3em] mb-1 italic">OBIETTIVO FINALE</h3>
-                      <p className="text-4xl font-black text-[#111811] dark:text-white italic tracking-tighter flex items-baseline gap-1">{targetWeight > 0 ? targetWeight : "--"} <span className="text-base opacity-40 not-italic uppercase">kg</span></p>
-                    </div>
-                  </div>
-                </motion.div>
 
                 <section className="space-y-12">
                   <div className="flex flex-col gap-6 mb-10 px-6">
 
                     <div className="flex bg-slate-200/50 dark:bg-white/5 p-2 rounded-2xl border border-slate-300/50 dark:border-white/5">
                       {['SETTIMANA', 'ANNO'].map((period) => (
-                        <button key={period} onClick={() => setWeightPeriod(period.substring(0, 4).toUpperCase())} className={cn("flex-1 py-4 text-2xl font-black rounded-xl transition-all uppercase tracking-tighter", weightPeriod === period.substring(0, 4).toUpperCase() ? "bg-primary text-[#050a05] shadow-md" : "text-slate-500 dark:text-white/30 hover:text-slate-800 dark:hover:text-white/60")}>
+                        <button key={period} onClick={() => setWeightPeriod(period.substring(0, 4).toUpperCase())} className={cn("flex-1 py-6 text-4xl font-black rounded-xl transition-all uppercase tracking-tighter", weightPeriod === period.substring(0, 4).toUpperCase() ? "bg-amber-500 text-[#050a05] shadow-md" : "text-slate-500 dark:text-white/30 hover:text-slate-800 dark:hover:text-white/60")}>
                           {period}
                         </button>
                       ))}
@@ -675,8 +713,8 @@ export default function Home() {
                         <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#13ec13" stopOpacity={0.5} />
-                              <stop offset="95%" stopColor="#13ec13" stopOpacity={0} />
+                              <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.5} />
+                              <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
@@ -685,7 +723,7 @@ export default function Home() {
                             dataKey="day"
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 600 }}
+                            tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 900 }}
                             minTickGap={10}
                           />
                           <Tooltip
@@ -703,12 +741,12 @@ export default function Home() {
                           <Area
                             type="monotone"
                             dataKey="weight"
-                            stroke="#13ec13"
+                            stroke="#f59e0b"
                             strokeWidth={4}
                             fillOpacity={1}
                             fill="url(#colorWeight)"
                             isAnimationActive={false}
-                            dot={{ r: 4, fill: '#13ec13', strokeWidth: 0 }}
+                            dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }}
                           />
                         </AreaChart>
                       </ResponsiveContainer>
