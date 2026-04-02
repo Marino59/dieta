@@ -9,6 +9,7 @@ import { getDailyCoachAdvice, getHungryAdvice, parseWeightGoal } from "@/lib/ai"
 import ConfirmMealModal from '@/components/ConfirmMealModal';
 import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
+import MenuAdvisorModal from '@/components/MenuAdvisorModal';
 import {
   AreaChart,
   Area,
@@ -59,10 +60,17 @@ export default function Home() {
   const dateInputRef = useRef(null);
   const [swipeDirection, setSwipeDirection] = useState(0);
   const [weightViewReady, setWeightViewReady] = useState(false);
+  const [showMenuAdvisor, setShowMenuAdvisor] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [authLoading, user, router]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -93,24 +101,31 @@ export default function Home() {
   useEffect(() => {
     if (!user) return;
     setLoading(true);
-    getUserProfile(user.uid).then(p => {
+
+    let unsubscribeMeals = () => {};
+
+    getUserProfile().then(p => {
       setProfile(p);
-      if (p) {
-        getWeights(user.uid).then(w => {
-          setWeights(w);
-          setChartReady(true);
-        });
+      if (!p) {
+        // New user: no profile yet → send them to setup
+        router.push('/profile');
+        setLoading(false);
+        return;
       }
+
+      // Existing user: load weights and subscribe to meals
+      getWeights().then(w => {
+        setWeights(w);
+        setChartReady(true);
+      });
+
+      unsubscribeMeals = subscribeToMeals(selectedDate, (updatedMeals) => {
+        setMeals(updatedMeals);
+        setLoading(false);
+      });
     });
 
-    const unsubscribe = subscribeToMeals(selectedDate, (updatedMeals) => {
-      setMeals(updatedMeals);
-      setLoading(false);
-    });
-
-    getWeights(user.uid).then(setWeights);
-
-    return () => unsubscribe();
+    return () => unsubscribeMeals();
   }, [user, selectedDate]);
 
   useEffect(() => {
@@ -385,7 +400,7 @@ export default function Home() {
                     ></div>
                   </div>
                   <h1 className="text-[#111811] dark:text-white text-9xl font-black leading-tight tracking-tighter flex-1 text-center italic drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]">DIETA</h1>
-                  <div className="flex w-32 items-center justify-end relative">
+                  <div className="flex w-32 items-center justify-end relative shrink-0">
                     <input
                       ref={dateInputRef}
                       type="date"
@@ -405,9 +420,9 @@ export default function Home() {
                     />
                     <button
                       onClick={() => dateInputRef.current?.showPicker()}
-                      className="flex cursor-pointer items-center justify-center rounded-[2rem] size-24 bg-[#0a150a] text-white hover:bg-slate-800 transition-all active:scale-90 shadow-2xl border-4 border-primary/50"
+                      className="flex cursor-pointer items-center justify-center transition-transform active:scale-95 text-[#0a150a] dark:text-white hover:text-primary bg-transparent size-32"
                     >
-                      <span className="material-symbols-outlined text-8xl">calendar_month</span>
+                      <span className="material-symbols-outlined drop-shadow-md" style={{ fontSize: '100px' }}>calendar_month</span>
                     </button>
                   </div>
                 </div>
@@ -508,23 +523,30 @@ export default function Home() {
                   </motion.div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 px-6 py-6">
+                <div className="grid grid-cols-3 gap-4 px-6 py-6">
                   <motion.button
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                     onClick={() => handleSetCurrentView('add-meal')}
-                    className="flex flex-col items-center justify-center gap-6 w-full h-32 rounded-3xl bg-gradient-to-br from-primary to-[#0ed10e] text-[#050a05] shadow-[0_30px_70px_rgba(19,236,19,0.3)] border-8 border-white/20 relative overflow-hidden group"
+                    className="flex flex-col items-center justify-center w-full h-32 sm:h-40 rounded-3xl bg-gradient-to-br from-primary to-[#0ed10e] text-[#050a05] shadow-[0_30px_70px_rgba(19,236,19,0.3)] border-8 border-white/20 relative overflow-hidden group"
                   >
-                    <span className="material-symbols-outlined text-5xl">add_circle</span>
-                    <span className="font-black text-4xl tracking-tighter italic uppercase">AGGIUNGI</span>
+                    <span className="font-black text-3xl sm:text-4xl tracking-tight italic uppercase text-center w-full px-1 flex-1 flex items-center justify-center">AGGIUNGI</span>
                   </motion.button>
 
                   <motion.button
                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                     onClick={handleHoFame}
-                    className="flex flex-col items-center justify-center gap-6 w-full h-32 rounded-3xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-[0_30px_70px_rgba(245,158,11,0.3)] border-8 border-white/20 relative overflow-hidden group"
+                    className="flex flex-col items-center justify-center w-full h-32 sm:h-40 rounded-3xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-[0_30px_70px_rgba(245,158,11,0.3)] border-8 border-white/20 relative overflow-hidden group"
                   >
-                    <span className="material-symbols-outlined text-5xl">restaurant</span>
-                    <span className="font-black text-4xl tracking-tighter italic uppercase">HO FAME</span>
+                    <span className="font-black text-3xl sm:text-4xl tracking-tight italic uppercase text-center w-full px-1 flex-1 flex items-center justify-center">HO FAME</span>
+                  </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowMenuAdvisor(true)}
+                    className="flex flex-col items-center justify-center w-full h-32 sm:h-40 rounded-3xl bg-gradient-to-br from-teal-400 to-emerald-600 text-white shadow-[0_30px_70px_rgba(16,185,129,0.3)] border-8 border-white/20 relative overflow-hidden group"
+                  >
+                    <span className="text-4xl mb-1">🍽️</span>
+                    <span className="font-black text-2xl sm:text-3xl tracking-tight italic uppercase text-center w-full px-1">MENU</span>
                   </motion.button>
                 </div>
 
@@ -840,11 +862,11 @@ export default function Home() {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="absolute inset-0 z-[60] bg-background-light dark:bg-[#050a05] px-0 sm:px-6 pt-4 min-h-screen overflow-y-auto"
+            className="absolute inset-0 z-[60] bg-background-light dark:bg-[#050a05] px-0 sm:px-6 pt-16 min-h-screen overflow-y-auto"
           >
             <div className="max-w-4xl mx-auto pb-4">
               <div className="flex items-center justify-between mb-4 px-4">
-                <button onClick={() => handleSetCurrentView('dashboard')} className="flex items-center gap-4 text-base bg-primary/10 px-4 py-4 rounded-xl active:scale-90 transition-transform"><ChevronLeft size={40} strokeWidth={4} /> INDIETRO</button>
+                <button onClick={() => handleSetCurrentView('dashboard')} className="flex items-center gap-4 text-2xl font-black bg-primary/10 px-6 py-5 rounded-2xl active:scale-90 transition-transform"><ChevronLeft size={44} strokeWidth={4} /> INDIETRO</button>
                 <div className="flex flex-col items-end">
                   <span className="text-xs font-bold text-primary/40 uppercase tracking-[0.3em] mb-1 italic">NUOVO INSERIMENTO (v1.2)</span>
                   <span className="text-3xl font-black italic uppercase tracking-tighter">AGGIUNGI PASTO</span>
@@ -890,6 +912,17 @@ export default function Home() {
           </div>
         )
       }
+
+      {/* Menu Advisor Modal */}
+      <AnimatePresence>
+        {showMenuAdvisor && (
+          <MenuAdvisorModal
+            onClose={() => setShowMenuAdvisor(false)}
+            profile={profile}
+            caloriesConsumed={totalCalories}
+          />
+        )}
+      </AnimatePresence>
     </div >
   );
 }

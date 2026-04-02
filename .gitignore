@@ -47,3 +47,13 @@ firestore-debug.log*
 
 # local db
 *.db
+
+# deploy tools & local config
+.appdeploy
+register.js
+tmp_reg.json
+deploy_tool.js
+
+# agent directories
+.agent/
+.agents/

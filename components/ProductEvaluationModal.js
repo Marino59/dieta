@@ -62,6 +62,11 @@ export default function ProductEvaluationModal({ productData, onClose, onConfirm
                     
                     {/* Health Score / Grade */}
                     <div className="flex flex-col items-center gap-6">
+                        {productData.imageUrl && (
+                            <div className="w-64 h-64 rounded-[3rem] overflow-hidden shadow-2xl border-4 border-slate-700/50 mb-4 bg-white flex items-center justify-center">
+                                <img src={productData.imageUrl} alt={productData.name} className="max-w-full max-h-full object-contain mix-blend-multiply" />
+                            </div>
+                        )}
                         <div className={`size-64 rounded-[4rem] flex flex-col items-center justify-center shadow-2xl border-8 ${
                             productData.healthScore > 75 ? 'bg-emerald-950/30 border-emerald-500/50 text-emerald-400' : 
                             productData.healthScore > 50 ? 'bg-amber-950/30 border-amber-500/50 text-amber-400' : 

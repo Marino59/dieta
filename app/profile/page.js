@@ -272,6 +272,16 @@ export default function ProfilePage() {
                         <h2 className="font-black text-3xl uppercase tracking-widest italic">Imposta Obiettivo</h2>
                     </div>
 
+                    <div className="mb-8 space-y-4">
+                        <label className="text-xl font-black text-[#618961] uppercase tracking-tighter block ml-2">Descrizione Obiettivo (es. "Voglio perdere 5kg per l'estate")</label>
+                        <textarea
+                            value={goalDescription}
+                            onChange={(e) => setGoalDescription(e.target.value)}
+                            className="w-full bg-[#f6f8f6] dark:bg-black/20 border-4 border-[#dbe6db] dark:border-white/10 rounded-[2.5rem] px-8 py-8 text-3xl font-bold focus:border-primary outline-none transition-all h-32 resize-none"
+                            placeholder="Racconta al coach il tuo obiettivo..."
+                        />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-8 mb-4">
                         <div className="space-y-4">
                             <label className="text-xl font-black text-[#618961] uppercase tracking-tighter block ml-2">Peso Obiettivo (kg)</label>
@@ -300,24 +310,53 @@ export default function ProfilePage() {
                 <section className="bg-primary rounded-[4rem] p-12 shadow-2xl shadow-primary/30 text-black space-y-12">
                     <div className="text-center">
                         <p className="text-xl font-black uppercase tracking-[0.3em] opacity-80">TARGET GIORNALIERO</p>
-                        <div className="text-[10rem] font-black mt-2 leading-none flex items-center justify-center gap-2">
-                            {targetCalories}
+                        <div className="mt-2 flex items-center justify-center gap-2">
+                            <input
+                                type="number"
+                                value={targetCalories}
+                                onChange={(e) => setTargetCalories(parseInt(e.target.value) || 0)}
+                                className="bg-transparent border-b-8 border-black/20 focus:border-black text-center outline-none w-[200px] md:w-[280px] appearance-none text-[8rem] sm:text-[10rem] font-black leading-none"
+                            />
                             <span className="text-4xl font-black opacity-60">kcal</span>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-6 bg-black/10 rounded-[3rem] p-8 border-2 border-black/5">
-                        <div className="text-center">
+                        <div className="text-center flex flex-col items-center">
                             <p className="text-xl font-bold opacity-60 italic">PROT</p>
-                            <p className="text-4xl font-black">{protein}g</p>
+                            <div className="flex items-end justify-center">
+                                <input
+                                    type="number"
+                                    value={protein}
+                                    onChange={(e) => setProtein(parseInt(e.target.value) || 0)}
+                                    className="bg-transparent border-b-4 border-black/20 focus:border-black text-center outline-none w-20 sm:w-28 appearance-none text-4xl font-black"
+                                />
+                                <span className="text-4xl font-black mb-1">g</span>
+                            </div>
                         </div>
-                        <div className="text-center border-x-4 border-black/10 px-4">
+                        <div className="text-center border-x-4 border-black/10 px-4 flex flex-col items-center">
                             <p className="text-xl font-bold opacity-60 italic">CARB</p>
-                            <p className="text-4xl font-black">{carbs}g</p>
+                            <div className="flex items-end justify-center">
+                                <input
+                                    type="number"
+                                    value={carbs}
+                                    onChange={(e) => setCarbs(parseInt(e.target.value) || 0)}
+                                    className="bg-transparent border-b-4 border-black/20 focus:border-black text-center outline-none w-20 sm:w-28 appearance-none text-4xl font-black"
+                                />
+                                <span className="text-4xl font-black mb-1">g</span>
+                            </div>
                         </div>
-                        <div className="text-center">
+                        <div className="text-center flex flex-col items-center">
                             <p className="text-xl font-bold opacity-60 italic">GRASSI</p>
-                            <p className="text-4xl font-black">{fat}g</p>
+                            <div className="flex items-end justify-center">
+                                <input
+                                    type="number"
+                                    value={fat}
+                                    onChange={(e) => setFat(parseInt(e.target.value) || 0)}
+                                    className="bg-transparent border-b-4 border-black/20 focus:border-black text-center outline-none w-20 sm:w-28 appearance-none text-4xl font-black"
+                                />
+                                <span className="text-4xl font-black mb-1">g</span>
+                            </div>
                         </div>
                     </div>
 

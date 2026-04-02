@@ -126,11 +126,19 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
             const data = await getProductFromBarcode(code);
             // Enrich with AI analysis
             try {
-                const aiAnalysis = await analyzeBarcodeProduct(data, profile);
-                data.analysis = aiAnalysis;
+                const aiAnalysisObj = await analyzeBarcodeProduct(data, profile);
+                data.healthScore = aiAnalysisObj.healthScore;
+                data.advice = aiAnalysisObj.advice;
+                data.pros = aiAnalysisObj.pros || [];
+                data.cons = aiAnalysisObj.cons || [];
+                data.analysis = aiAnalysisObj.advice; // Fallback for components seeking '.analysis'
             } catch (aiError) {
                 console.error("AI Barcode Analysis fallback:", aiError);
-                data.analysis = `⚠️ L'Intelligenza Artificiale è attualmente intasata da troppe richieste simultanee o in pausa tecnica. \n\nI dati del prodotto (calorie, macronutrienti) sono comunque stati recuperati con successo dal database e visualizzati qui sopra. Riprova la scansione dell'etichetta tra qualche minuto per ricevere anche il parere qualitativo del nutrizionista virtuale.`;
+                data.advice = `⚠️ L'Intelligenza Artificiale è attualmente intasata da troppe richieste simultanee o in pausa tecnica. \n\nI dati del prodotto (calorie, macronutrienti) sono comunque stati recuperati con successo dal database e visualizzati qui sopra. Riprova la scansione dell'etichetta tra qualche minuto per ricevere anche il parere qualitativo del nutrizionista virtuale.`;
+                data.analysis = data.advice;
+                data.healthScore = 50;
+                data.pros = [];
+                data.cons = [];
             }
 
             if (onProductEvaluated) {
@@ -164,10 +172,10 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
             <div className="grid grid-cols-3 w-full gap-2 mb-6 px-2">
                 <button
                     onClick={() => setActiveTab('camera')}
-                    className={`aspect-square rounded-[2rem] flex flex-col items-center justify-center transition-all ${activeTab === 'camera' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
+                    className={`aspect-square rounded-[2rem] flex flex-col items-center justify-center transition-all ${activeTab === 'camera' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100'}`}
                     style={{
-                        background: activeTab === 'camera' ? 'linear-gradient(135deg, #13ec13 0%, #0ea50e 100%)' : '',
-                        color: activeTab === 'camera' ? 'white' : '#618961'
+                        background: 'linear-gradient(135deg, #13ec13 0%, #0ea50e 100%)',
+                        color: 'white'
                     }}
                 >
                     <span className="text-[4rem] drop-shadow-xl mb-1">📸</span>
@@ -176,10 +184,10 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
 
                 <button
                     onClick={() => setActiveTab('text')}
-                    className={`aspect-square rounded-[2rem] flex flex-col items-center justify-center transition-all ${activeTab === 'text' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
+                    className={`aspect-square rounded-[2rem] flex flex-col items-center justify-center transition-all ${activeTab === 'text' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100'}`}
                     style={{
-                        background: activeTab === 'text' ? 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)' : '',
-                        color: activeTab === 'text' ? 'white' : '#1e40af'
+                        background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
+                        color: 'white'
                     }}
                 >
                     <span className="text-[4rem] drop-shadow-xl mb-1">✍️</span>
@@ -188,10 +196,10 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
 
                 <button
                     onClick={() => setActiveTab('barcode')}
-                    className={`aspect-square rounded-[2rem] flex flex-col items-center justify-center transition-all ${activeTab === 'barcode' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100 bg-slate-100 dark:bg-slate-800'}`}
+                    className={`aspect-square rounded-[2rem] flex flex-col items-center justify-center transition-all ${activeTab === 'barcode' ? 'shadow-2xl scale-105 z-10 border-4 border-white' : 'opacity-60 hover:opacity-100 scale-100'}`}
                     style={{
-                        background: activeTab === 'barcode' ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' : '',
-                        color: activeTab === 'barcode' ? 'white' : '#92400e'
+                        background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                        color: 'white'
                     }}
                 >
                     <span className="text-[4rem] drop-shadow-xl mb-1">🤳</span>
