@@ -40,6 +40,12 @@
   --foreground: #ffffff;
 }
 
+html {
+  font-size: 16px; /* Explicit base font size — prevents iOS Safari autosizing */
+  -webkit-text-size-adjust: 100%; /* Prevents iOS Safari from scaling text in landscape/narrow containers */
+  text-size-adjust: 100%;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
@@ -48,8 +54,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  -webkit-text-size-adjust: 100%; /* Prevents iOS Safari from auto-zooming text */
-  text-size-adjust: 100%;
 }
 
 .material-symbols-outlined {
