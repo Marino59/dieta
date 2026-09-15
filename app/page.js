@@ -195,7 +195,13 @@ export default function Home() {
 
   const handleDeleteMeal = async (id) => {
     if (confirm('Eliminare questo pasto?')) {
-      await deleteMeal(id);
+      try {
+        setMeals(prev => prev.filter(m => m.id !== id));
+        await deleteMeal(id);
+      } catch (err) {
+        console.error("Errore eliminazione pasto:", err);
+        alert("Errore durante l'eliminazione: " + err.message);
+      }
     }
   };
 
@@ -637,9 +643,16 @@ export default function Home() {
                             <h4 className="text-5xl font-black italic uppercase tracking-tighter truncate leading-tight">{meal.name}</h4>
                             <div className="flex items-center gap-4 mt-2"><span className="text-3xl font-bold opacity-40 italic">{meal.quantity}g</span><div className="size-2 rounded-full bg-primary/30" /><span className="text-3xl font-black text-primary italic uppercase tracking-widest">{meal.calories} KCAL</span></div>
                           </div>
-                          <div className="flex flex-col items-end gap-4">
-                            <div className="text-2xl text-white/30 font-black italic bg-black/20 px-4 py-2 rounded-full">{new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteMeal(meal.id); }} className="size-10 rounded-3xl bg-red-500/10 text-red-500 flex shrink-0 items-center justify-center active:scale-90 opacity-0 group-hover:opacity-100 transition-all shadow-lg border-2 border-red-500/10"><Trash2 size={40} /></button>
+                          <div className="flex flex-col items-end gap-3">
+                            <div className="text-2xl text-white/40 font-black italic bg-black/20 px-4 py-2 rounded-full">{new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteMeal(meal.id); }}
+                              className="size-16 rounded-2xl bg-red-500/15 hover:bg-red-500/25 text-red-500 flex shrink-0 items-center justify-center active:scale-90 transition-all shadow-md border-2 border-red-500/20 cursor-pointer"
+                              title="Elimina pasto"
+                            >
+                              <Trash2 size={32} />
+                            </button>
                           </div>
                         </motion.div>
                       ))
