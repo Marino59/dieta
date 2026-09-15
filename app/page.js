@@ -723,7 +723,9 @@ export default function Home() {
                             <div className="flex items-center gap-4 mt-2"><span className="text-3xl font-bold opacity-40 italic">{meal.quantity}g</span><div className="size-2 rounded-full bg-primary/30" /><span className="text-3xl font-black text-primary italic uppercase tracking-widest">{meal.calories} KCAL</span></div>
                           </div>
                           <div className="flex flex-col items-end gap-3">
-                            <div className="text-2xl text-white/40 font-black italic bg-black/20 px-4 py-2 rounded-full">{new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                            <div className="text-2xl font-black italic px-4 py-1.5 rounded-full bg-slate-200/80 dark:bg-white/15 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-white/10 tracking-tight shadow-sm">
+                              {new Date(meal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleDeleteMeal(meal.id); }}
