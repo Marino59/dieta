@@ -24,6 +24,7 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
       </head>
       <body className="antialiased min-h-screen bg-background-light dark:bg-background-dark">
         <AuthContextProvider>

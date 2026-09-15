@@ -10,6 +10,7 @@ import ConfirmMealModal from '@/components/ConfirmMealModal';
 import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
 import MenuAdvisorModal from '@/components/MenuAdvisorModal';
+import { syncMealToGoogleHealth } from '@/lib/google-health';
 import {
   AreaChart,
   Area,
@@ -61,6 +62,7 @@ export default function Home() {
   const [swipeDirection, setSwipeDirection] = useState(0);
   const [weightViewReady, setWeightViewReady] = useState(false);
   const [showMenuAdvisor, setShowMenuAdvisor] = useState(false);
+  const [healthToast, setHealthToast] = useState(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -161,6 +163,26 @@ export default function Home() {
       } else {
         await addMeal(mealData);
       }
+
+      // Sincronizzazione con Pixel Watch / Google Health
+      if (mealData.syncToGoogleHealth) {
+        try {
+          await syncMealToGoogleHealth(mealData);
+          setHealthToast({
+            type: 'success',
+            message: 'Pasto inviato al Pixel Watch!'
+          });
+          setTimeout(() => setHealthToast(null), 4000);
+        } catch (healthErr) {
+          console.warn("Google Health sync info:", healthErr);
+          setHealthToast({
+            type: 'warning',
+            message: `Pasto salvato! Pixel Watch: ${healthErr.message}`
+          });
+          setTimeout(() => setHealthToast(null), 5000);
+        }
+      }
+
       setPendingMealData(null);
       setEditingMeal(null);
       setCurrentView('dashboard');
@@ -370,6 +392,20 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-[#050a05] font-sans pb-12 transition-colors duration-500 overflow-x-hidden">
+      {/* Toast Notifica Pixel Watch */}
+      {healthToast && (
+        <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-[100000] px-8 py-5 rounded-3xl shadow-2xl backdrop-blur-xl border-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-300 max-w-[90vw] transition-all ${
+          healthToast.type === 'success'
+            ? 'bg-slate-900/95 text-white border-emerald-500/60 shadow-emerald-950/40'
+            : 'bg-slate-900/95 text-white border-amber-500/60 shadow-amber-950/40'
+        }`}>
+          <span className={`material-symbols-outlined text-4xl ${
+            healthToast.type === 'success' ? 'text-emerald-400' : 'text-amber-400'
+          }`}>watch</span>
+          <span className="text-xl font-black">{healthToast.message}</span>
+          <button onClick={() => setHealthToast(null)} className="ml-2 text-slate-400 hover:text-white text-2xl font-bold">✕</button>
+        </div>
+      )}
       <AnimatePresence mode="wait" custom={swipeDirection}>
         {currentView === 'dashboard' && (
           <motion.div

@@ -4,11 +4,14 @@ import { useState, useEffect } from 'react';
 
 import { Check, X, Minus, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { updateAnalysisFromText } from '@/lib/ai';
+import { isGoogleHealthConnected, isGoogleHealthAutoSync } from '@/lib/google-health';
 
 export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoading, defaultDate }) {
     const [quantity, setQuantity] = useState(mealData.quantity || 100);
     const [analysis, setAnalysis] = useState(mealData.analysis || '');
     const [mounted, setMounted] = useState(false);
+    const [healthAvailable, setHealthAvailable] = useState(false);
+    const [syncToHealth, setSyncToHealth] = useState(false);
 
     // Initialize date logic
     const getInitialDate = () => {
@@ -41,6 +44,11 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
     // Mount on client side only for Portal
     useEffect(() => {
         setMounted(true);
+        const connected = isGoogleHealthConnected();
+        setHealthAvailable(connected);
+        if (connected) {
+            setSyncToHealth(isGoogleHealthAutoSync());
+        }
         // Lock body scroll
         document.body.style.overflow = 'hidden';
 
@@ -76,7 +84,8 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
             carbs: scaleMacro(mealData.carbs),
             fat: scaleMacro(mealData.fat),
             analysis,
-            created_at: finalDate
+            created_at: finalDate,
+            syncToGoogleHealth: syncToHealth
         });
     };
 
@@ -206,6 +215,34 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
                             IMPOSTA ORA ORA
                         </button>
                     </div>
+
+                    {/* Pixel Watch Sync Option */}
+                    {healthAvailable && (
+                        <button
+                            type="button"
+                            onClick={() => setSyncToHealth(prev => !prev)}
+                            className={`w-full p-8 rounded-[2.5rem] border-4 transition-all flex items-center justify-between gap-4 active:scale-98 cursor-pointer ${
+                                syncToHealth
+                                    ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
+                                    : 'bg-slate-900 border-slate-800 text-slate-400'
+                            }`}
+                        >
+                            <div className="flex items-center gap-6">
+                                <span className="material-symbols-outlined text-5xl">watch</span>
+                                <div className="text-left">
+                                    <div className="text-3xl font-black text-white">Pixel Watch / Google Health</div>
+                                    <div className="text-xl font-bold opacity-75">
+                                        {syncToHealth ? 'Sincronizzazione attiva per questo pasto' : 'Tocca per inviare a Pixel Watch'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black ${
+                                syncToHealth ? 'bg-emerald-500 text-black' : 'bg-slate-800 text-slate-600'
+                            }`}>
+                                {syncToHealth ? <Check size={36} strokeWidth={4} /> : null}
+                            </div>
+                        </button>
+                    )}
 
                     {/* Integrated Confirmation Button - Moving it inside the scroll flow to avoid overlay issues */}
                     <div className="pb-32">

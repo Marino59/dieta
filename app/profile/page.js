@@ -5,6 +5,13 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { getUserProfile, saveUserProfile } from '@/lib/firestore';
 import { calculateTargetsFromGoal } from '@/lib/ai';
+import {
+    isGoogleHealthConnected,
+    connectGoogleHealth,
+    disconnectGoogleHealth,
+    isGoogleHealthAutoSync,
+    setGoogleHealthAutoSync
+} from '@/lib/google-health';
 
 const ACTIVITY_LEVELS = [
     { value: 1.2, label: 'Sedentario', desc: 'Lavoro d\'ufficio' },
@@ -43,6 +50,45 @@ export default function ProfilePage() {
 
     // Diet / Health 
     const [dietaryRestrictions, setDietaryRestrictions] = useState('');
+
+    // Pixel Watch / Google Health Integration
+    const [healthConnected, setHealthConnected] = useState(false);
+    const [healthAutoSync, setHealthAutoSync] = useState(true);
+    const [connectingHealth, setConnectingHealth] = useState(false);
+    const [healthFeedback, setHealthFeedback] = useState('');
+
+    useEffect(() => {
+        setHealthConnected(isGoogleHealthConnected());
+        setHealthAutoSync(isGoogleHealthAutoSync());
+    }, []);
+
+    const handleConnectHealth = async () => {
+        setConnectingHealth(true);
+        setHealthFeedback('');
+        try {
+            await connectGoogleHealth();
+            setHealthConnected(true);
+            setHealthFeedback('Collegato con successo al Pixel Watch / Google Health!');
+        } catch (err) {
+            console.error('Connection error:', err);
+            setHealthFeedback(err.message || 'Errore durante la connessione');
+        } finally {
+            setConnectingHealth(false);
+        }
+    };
+
+    const handleDisconnectHealth = () => {
+        if (confirm('Vuoi scollegare l\'integrazione con Pixel Watch / Google Health?')) {
+            disconnectGoogleHealth();
+            setHealthConnected(false);
+            setHealthFeedback('Integrazione scollegata.');
+        }
+    };
+
+    const handleToggleAutoSync = (enabled) => {
+        setHealthAutoSync(enabled);
+        setGoogleHealthAutoSync(enabled);
+    };
 
     useEffect(() => {
         if (!authLoading && !user) router.push('/login');
@@ -367,6 +413,76 @@ export default function ProfilePage() {
                                 CONSIGLIO DEL COACH:
                             </span>
                             "{aiExplanation}"
+                        </div>
+                    )}
+                </section>
+
+                {/* Pixel Watch & Google Health Integration */}
+                <section className="bg-white dark:bg-[#1a2e1a] rounded-[3rem] p-10 shadow-xl border-4 border-[#dbe6db] dark:border-white/10 space-y-8">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 text-primary">
+                            <span className="material-symbols-outlined text-5xl">watch</span>
+                            <h2 className="font-black text-3xl uppercase tracking-widest italic">Pixel Watch / Google Health</h2>
+                        </div>
+                        <span className={`px-5 py-2 rounded-full text-lg font-black tracking-wide uppercase flex items-center gap-2 ${
+                            healthConnected 
+                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' 
+                                : 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-300'
+                        }`}>
+                            <span className={`w-3 h-3 rounded-full ${healthConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}></span>
+                            {healthConnected ? 'Connesso' : 'Non collegato'}
+                        </span>
+                    </div>
+
+                    <p className="text-xl font-bold text-[#618961] leading-relaxed">
+                        Sincronizza in automatico calorie, macronutrienti e pasti registrati direttamente con l'account Google associato al tuo <strong>Pixel Watch</strong> e all'app <strong>Fitbit</strong>.
+                    </p>
+
+                    {healthFeedback && (
+                        <div className="p-5 rounded-2xl bg-primary/10 border-2 border-primary/30 text-lg font-bold text-primary">
+                            {healthFeedback}
+                        </div>
+                    )}
+
+                    {!healthConnected ? (
+                        <button
+                            type="button"
+                            onClick={handleConnectHealth}
+                            disabled={connectingHealth}
+                            className="w-full h-24 bg-primary text-black rounded-[2rem] font-black text-2xl shadow-xl hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-4 cursor-pointer"
+                        >
+                            {connectingHealth ? (
+                                <div className="animate-spin rounded-full h-8 w-8 border-4 border-black border-t-transparent"></div>
+                            ) : (
+                                <>
+                                    <span className="material-symbols-outlined text-4xl">add_link</span>
+                                    COLLEGA PIXEL WATCH / GOOGLE HEALTH
+                                </>
+                            )}
+                        </button>
+                    ) : (
+                        <div className="space-y-6 pt-2 border-t-2 border-[#dbe6db] dark:border-white/10">
+                            {/* Auto Sync Toggle */}
+                            <label className="flex items-center justify-between cursor-pointer p-4 rounded-2xl bg-[#f6f8f6] dark:bg-black/20 hover:bg-black/5 transition-colors">
+                                <div>
+                                    <div className="text-2xl font-black">Sincronizzazione Automatica</div>
+                                    <div className="text-lg text-[#618961] font-bold">Invia i pasti a Pixel Watch appena li salvi</div>
+                                </div>
+                                <input
+                                    type="checkbox"
+                                    checked={healthAutoSync}
+                                    onChange={(e) => handleToggleAutoSync(e.target.checked)}
+                                    className="w-8 h-8 accent-primary cursor-pointer"
+                                />
+                            </label>
+
+                            <button
+                                type="button"
+                                onClick={handleDisconnectHealth}
+                                className="w-full py-4 text-rose-500 hover:text-rose-600 font-bold text-xl transition-colors text-center"
+                            >
+                                Scollega account Pixel Watch
+                            </button>
                         </div>
                     )}
                 </section>
