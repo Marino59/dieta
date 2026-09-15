@@ -4,13 +4,13 @@ import React, { useState, useEffect, useRef, cloneElement, useMemo } from 'react
 import { useAuth } from '@/lib/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Trash2, TrendingUp, TrendingDown, Monitor, Calendar, Clock, Plus, ChevronLeft, ChevronRight, Activity, Loader2, AlertTriangle, User } from 'lucide-react';
-import { getMeals, deleteMeal, updateMeal, addMeal, getUserProfile, getWeights, addWeight, deleteWeight, subscribeToMeals } from '@/lib/firestore';
+import { getMeals, deleteMeal, updateMeal, addMeal, getUserProfile, getWeights, addWeight, updateWeight, deleteWeight, subscribeToMeals } from '@/lib/firestore';
 import { getDailyCoachAdvice, getHungryAdvice, parseWeightGoal } from "@/lib/ai";
 import ConfirmMealModal from '@/components/ConfirmMealModal';
 import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
 import MenuAdvisorModal from '@/components/MenuAdvisorModal';
-import { syncMealToGoogleHealth, deleteMealFromGoogleHealth, resyncDayWithGoogleHealth, isGoogleHealthConnected, connectGoogleHealth } from '@/lib/google-health';
+import { syncMealToGoogleHealth, deleteMealFromGoogleHealth, resyncDayWithGoogleHealth, syncWeightToGoogleHealth, deleteWeightFromGoogleHealth, isGoogleHealthConnected, connectGoogleHealth } from '@/lib/google-health';
 import {
   AreaChart,
   Area,
@@ -287,7 +287,35 @@ export default function Home() {
       const sanitizedWeight = parseFloat(newWeightValue.toString().replace(',', '.'));
       console.log("Sanitized weight:", sanitizedWeight);
       const timestamp = new Date(`${weightDate}T${weightTime}`);
-      await addWeight({ weight: sanitizedWeight, created_at: timestamp.toISOString() });
+      const savedWeight = await addWeight({ weight: sanitizedWeight, created_at: timestamp.toISOString() });
+
+      // Se Google Health / Pixel Watch è collegato, sincronizziamo il peso
+      if (isGoogleHealthConnected()) {
+        try {
+          const syncResult = await syncWeightToGoogleHealth({
+            weight: sanitizedWeight,
+            created_at: timestamp.toISOString()
+          });
+          if (syncResult?.dataPointName && savedWeight?.id) {
+            await updateWeight(savedWeight.id, {
+              googleHealthDataPointName: syncResult.dataPointName
+            });
+          }
+          setHealthToast({
+            type: 'success',
+            message: `Peso (${sanitizedWeight} kg) sincronizzato con Pixel Watch!`
+          });
+          setTimeout(() => setHealthToast(null), 4000);
+        } catch (healthErr) {
+          console.warn("Weight sync info:", healthErr);
+          setHealthToast({
+            type: 'warning',
+            message: `Peso salvato, ma errore sync Pixel Watch: ${healthErr.message}`
+          });
+          setTimeout(() => setHealthToast(null), 5000);
+        }
+      }
+
       const updatedWeights = await getWeights();
       setWeights(updatedWeights);
 
@@ -318,9 +346,29 @@ export default function Home() {
 
   const handleDeleteWeight = async (id) => {
     if (confirm('Eliminare questa pesata?')) {
-      await deleteWeight(id);
-      const updatedWeights = await getWeights(user.uid);
-      setWeights(updatedWeights);
+      try {
+        const weightToDelete = weights.find(w => w.id === id);
+
+        // Se la pesata era sincronizzata con Google Health, la eliminiamo anche da lì
+        if (weightToDelete?.googleHealthDataPointName) {
+          try {
+            await deleteWeightFromGoogleHealth(weightToDelete.googleHealthDataPointName);
+            setHealthToast({
+              type: 'success',
+              message: 'Peso rimosso anche da Pixel Watch!'
+            });
+            setTimeout(() => setHealthToast(null), 4000);
+          } catch (healthErr) {
+            console.warn("Google Health delete weight:", healthErr);
+          }
+        }
+
+        await deleteWeight(id);
+        const updatedWeights = await getWeights();
+        setWeights(updatedWeights);
+      } catch (err) {
+        console.error("Errore eliminazione pesata:", err);
+      }
     }
   };
 
@@ -938,9 +986,15 @@ export default function Home() {
                               <p className="text-slate-500 dark:text-white/40 text-2xl font-bold mt-2 italic">{new Date(getWeightTime(item)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-10">
-                            <span className="text-5xl font-black text-primary italic drop-shadow-[0_0_15px_rgba(34,197,94,0.3)]">{item.weight}<span className="text-2xl ml-2 not-italic font-bold text-slate-400 dark:text-white/20">kg</span></span>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteWeight(item.id); }} className="size-10 bg-red-500/10 text-red-500 rounded-3xl active:scale-75 transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center border-2 border-red-500/10"><Trash2 size={40} /></button>
+                          <div className="flex items-center gap-4 sm:gap-8">
+                            <span className="text-5xl font-black text-primary italic drop-shadow-[0_0_15px_rgba(34,197,94,0.3)] flex items-center gap-2">
+                              {item.weight}
+                              <span className="text-2xl not-italic font-bold text-slate-400 dark:text-white/20">kg</span>
+                              {item.googleHealthDataPointName && (
+                                <span className="text-xl" title="Sincronizzato con Pixel Watch">⌚</span>
+                              )}
+                            </span>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteWeight(item.id); }} className="size-14 bg-red-500/10 text-red-500 rounded-2xl active:scale-75 transition-all opacity-90 hover:opacity-100 flex items-center justify-center border border-red-500/20" title="Elimina pesata"><Trash2 size={28} /></button>
                           </div>
                         </motion.div>
                       ))

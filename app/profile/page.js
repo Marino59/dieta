@@ -435,7 +435,7 @@ export default function ProfilePage() {
                     </div>
 
                     <p className="text-xl font-bold text-[#618961] leading-relaxed">
-                        Sincronizza in automatico calorie, macronutrienti e pasti registrati direttamente con l'account Google associato al tuo <strong>Pixel Watch</strong> e all'app <strong>Fitbit</strong>.
+                        Sincronizza in automatico calorie, macronutrienti, pasti e pesate direttamente con l'account Google associato al tuo <strong>Pixel Watch</strong> e all'app <strong>Fitbit</strong>.
                     </p>
 
                     {healthFeedback && (
@@ -466,7 +466,7 @@ export default function ProfilePage() {
                             <label className="flex items-center justify-between cursor-pointer p-4 rounded-2xl bg-[#f6f8f6] dark:bg-black/20 hover:bg-black/5 transition-colors">
                                 <div>
                                     <div className="text-2xl font-black">Sincronizzazione Automatica</div>
-                                    <div className="text-lg text-[#618961] font-bold">Invia i pasti a Pixel Watch appena li salvi</div>
+                                    <div className="text-lg text-[#618961] font-bold">Invia pasti e peso a Pixel Watch appena li registri</div>
                                 </div>
                                 <input
                                     type="checkbox"
