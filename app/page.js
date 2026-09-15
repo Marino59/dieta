@@ -10,7 +10,7 @@ import ConfirmMealModal from '@/components/ConfirmMealModal';
 import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
 import MenuAdvisorModal from '@/components/MenuAdvisorModal';
-import { syncMealToGoogleHealth } from '@/lib/google-health';
+import { syncMealToGoogleHealth, deleteMealFromGoogleHealth } from '@/lib/google-health';
 import {
   AreaChart,
   Area,
@@ -158,19 +158,27 @@ export default function Home() {
   const handleSaveNewMeal = async (mealData) => {
     setLoading(true);
     try {
-      if (editingMeal) {
-        await updateMeal(editingMeal.id, mealData);
-      } else {
-        await addMeal(mealData);
+      const finalMealData = { ...mealData };
+
+      // Se stiamo modificando un pasto precedentemente sincronizzato, rimuoviamo la vecchia voce da Google Health
+      if (editingMeal && editingMeal.googleHealthDataPointName) {
+        try {
+          await deleteMealFromGoogleHealth(editingMeal.googleHealthDataPointName);
+        } catch (delErr) {
+          console.warn("Vecchia voce Google Health non rimossa:", delErr);
+        }
       }
 
-      // Sincronizzazione con Pixel Watch / Google Health
+      // Sincronizzazione nuovo/modificato con Pixel Watch / Google Health
       if (mealData.syncToGoogleHealth) {
         try {
-          await syncMealToGoogleHealth(mealData);
+          const syncRes = await syncMealToGoogleHealth(mealData);
+          if (syncRes?.dataPointName) {
+            finalMealData.googleHealthDataPointName = syncRes.dataPointName;
+          }
           setHealthToast({
             type: 'success',
-            message: 'Pasto inviato al Pixel Watch!'
+            message: editingMeal ? 'Pasto aggiornato anche su Pixel Watch!' : 'Pasto inviato al Pixel Watch!'
           });
           setTimeout(() => setHealthToast(null), 4000);
         } catch (healthErr) {
@@ -181,6 +189,12 @@ export default function Home() {
           });
           setTimeout(() => setHealthToast(null), 5000);
         }
+      }
+
+      if (editingMeal) {
+        await updateMeal(editingMeal.id, finalMealData);
+      } else {
+        await addMeal(finalMealData);
       }
 
       setPendingMealData(null);
@@ -196,7 +210,23 @@ export default function Home() {
   const handleDeleteMeal = async (id) => {
     if (confirm('Eliminare questo pasto?')) {
       try {
+        const mealToDelete = meals.find(m => m.id === id);
         setMeals(prev => prev.filter(m => m.id !== id));
+
+        // Se il pasto era sincronizzato con Google Health, lo eliminiamo anche da lì
+        if (mealToDelete?.googleHealthDataPointName) {
+          try {
+            await deleteMealFromGoogleHealth(mealToDelete.googleHealthDataPointName);
+            setHealthToast({
+              type: 'success',
+              message: 'Pasto rimosso anche da Pixel Watch!'
+            });
+            setTimeout(() => setHealthToast(null), 4000);
+          } catch (healthErr) {
+            console.warn("Google Health delete info:", healthErr);
+          }
+        }
+
         await deleteMeal(id);
       } catch (err) {
         console.error("Errore eliminazione pasto:", err);
