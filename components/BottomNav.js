@@ -36,7 +36,7 @@ export default function BottomNav() {
         }
     ];
     return (
-        <nav className="fixed bottom-0 left-0 right-0 h-44 bg-white dark:bg-[#0a0f0a]/90 backdrop-blur-3xl border-t-4 border-white/5 flex justify-around items-stretch z-50 shadow-[0_-20px_100px_rgba(0,0,0,0.5)]">
+        <nav className="fixed bottom-0 left-0 right-0 h-44 bg-white dark:bg-[#0a0f0a]/90 backdrop-blur-3xl border-t-4 border-white/5 flex justify-around items-stretch z-50 shadow-[0_-20px_100px_rgba(0,0,0,0.5)] bottom-nav-safe">
             {navItems.map((item) => (
                 <button
                     key={item.name}

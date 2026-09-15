@@ -94,3 +94,47 @@ body {
   white-space: nowrap;
   direction: ltr;
 }
+
+/* ==========================================================================
+   REGOLE ESCLUSIVE PER IOS (.platform-ios)
+   Tutte le modifiche, correzioni o stili specifici per iPhone/iPad vanno QUI.
+   Queste regole NON hanno NESSUN effetto su telefoni Android o Desktop.
+   ========================================================================== */
+.platform-ios {
+  --safe-bottom: env(safe-area-inset-bottom, 24px);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Evita lo zoom automatico involontario di Safari iOS sui campi input */
+.platform-ios input:not([type="checkbox"]):not([type="radio"]),
+.platform-ios textarea,
+.platform-ios select {
+  font-size: max(16px, 1rem);
+}
+
+/* Gestione Safe Area per barre fisse e modali su iOS */
+.platform-ios .bottom-nav-safe {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+/* ==========================================================================
+   REGOLE ESCLUSIVE PER ANDROID (.platform-android)
+   Tutte le modifiche, correzioni o stili specifici per Android vanno QUI.
+   Queste regole NON hanno NESSUN effetto su iPhone o iPad.
+   ========================================================================== */
+.platform-android {
+  --safe-bottom: 12px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.platform-android .bottom-nav-safe {
+  padding-bottom: 8px;
+}
+
+/* ==========================================================================
+   REGOLE ESCLUSIVE PER DESKTOP (.platform-desktop)
+   ========================================================================== */
+.platform-desktop {
+  --safe-bottom: 0px;
+}
