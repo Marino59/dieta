@@ -960,26 +960,65 @@ export default function Home() {
               <h1 className="text-5xl font-black italic uppercase tracking-tighter text-primary drop-shadow-[0_0_15px_rgba(19,236,19,0.3)]">HO FAME</h1>
               <div className="w-10" />
             </header>
-            <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full">
+            <main className="flex-1 px-4 sm:px-6 py-6 max-w-2xl mx-auto w-full pb-36">
               {!hungryAdvice && loadingHungry ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-6"><div className="animate-spin size-24 border-[8px] border-primary border-t-transparent rounded-full shadow-[0_0_50px_rgba(19,236,19,0.4)]"></div><p className="text-2xl text-primary italic font-black animate-pulse tracking-tighter">AI STA CUCINANDO...</p></div>
+                <div className="flex flex-col items-center justify-center py-28 gap-8">
+                  <div className="animate-spin size-28 border-[10px] border-amber-400 border-t-transparent rounded-full shadow-[0_0_50px_rgba(245,158,11,0.4)]"></div>
+                  <p className="text-3xl text-amber-400 italic font-black animate-pulse tracking-tight">AI STA PREPARANDO IL CONSIGLIO...</p>
+                </div>
               ) : hungryAdvice ? (
-                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-[#121c12]/80 backdrop-blur-3xl rounded-3xl p-8 border-4 border-amber-400 shadow-[0_30px_60px_rgba(245,158,11,0.2)] relative overflow-hidden">
-                  <div className="absolute -top-10 -right-10 opacity-5 rotate-12"><span className="material-symbols-outlined text-[10rem]">restaurant</span></div>
-                  <div className="flex items-center gap-4 mb-6 text-amber-500"><span className="material-symbols-outlined text-5xl">restaurant</span><div><h3 className="font-black text-2xl uppercase tracking-tighter leading-none mb-1">CONSIGLIO</h3><p className="text-sm font-bold opacity-70 italic tracking-widest">DI ALTA CUCINA AI</p></div></div>
-                  <div className="space-y-8">
-                    <p className="text-3xl font-black italic text-white leading-tight tracking-tighter">"{hungryAdvice.message}"</p>
-                    <div className="bg-amber-400/10 rounded-2xl p-6 border-2 border-amber-400/20 shadow-inner">
-                      <p className="text-sm font-black text-amber-500 uppercase tracking-[0.4em] mb-4 text-center">SPUNTINO PERFETTO</p>
-                      <p className="text-4xl font-black text-amber-400 mb-6 text-center leading-none italic drop-shadow-md">{hungryAdvice.snack}</p>
-                      <div className="h-1 w-16 bg-amber-400/30 mx-auto mb-6 rounded-full"></div>
-                      <p className="text-xl font-bold text-white/80 italic text-center leading-relaxed tracking-tight">{hungryAdvice.reason}</p>
-                    </div>
-                    <button onClick={() => handleHoFame()} className="w-full py-5 rounded-2xl bg-amber-500 text-[#050a05] font-black text-2xl shadow-[0_20px_40px_rgba(245,158,11,0.3)] active:scale-95 transition-all flex items-center justify-center gap-4 uppercase italic border-2 border-white/20"><span className="material-symbols-outlined text-3xl">refresh</span>Cambia snack</button>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-[#121c12]/90 backdrop-blur-3xl rounded-[2.5rem] p-8 sm:p-12 border-4 border-amber-400 shadow-[0_30px_70px_rgba(245,158,11,0.25)] relative overflow-hidden space-y-10"
+                >
+                  <div className="absolute -top-10 -right-10 opacity-5 rotate-12 pointer-events-none">
+                    <span className="material-symbols-outlined text-[14rem]">restaurant</span>
                   </div>
+
+                  <div className="flex items-center gap-5 text-amber-400">
+                    <span className="material-symbols-outlined text-6xl">restaurant</span>
+                    <div>
+                      <h3 className="font-black text-3xl uppercase tracking-wider leading-none mb-1">CONSIGLIO</h3>
+                      <p className="text-xl font-bold opacity-80 italic tracking-widest text-amber-300">DI ALTA CUCINA AI</p>
+                    </div>
+                  </div>
+
+                  <p className="text-4xl sm:text-5xl font-black italic text-white leading-snug tracking-tight">
+                    "{hungryAdvice.message}"
+                  </p>
+
+                  <div className="bg-amber-400/15 rounded-[2rem] p-8 sm:p-10 border-3 border-amber-400/30 shadow-inner space-y-6">
+                    <p className="text-2xl font-black text-amber-400 uppercase tracking-[0.3em] text-center">
+                      SPUNTINO PERFETTO
+                    </p>
+                    <p className="text-5xl sm:text-6xl font-black text-amber-300 text-center leading-tight italic drop-shadow-md">
+                      {hungryAdvice.snack}
+                    </p>
+                    <div className="h-1.5 w-24 bg-amber-400/40 mx-auto rounded-full"></div>
+                    <p className="text-2xl sm:text-3xl font-bold text-white/90 italic text-center leading-relaxed tracking-normal">
+                      {hungryAdvice.reason}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleHoFame()}
+                    className="w-full h-24 sm:h-28 rounded-3xl bg-amber-400 hover:bg-amber-300 text-black font-black text-3xl shadow-[0_20px_50px_rgba(245,158,11,0.35)] active:scale-95 transition-all flex items-center justify-center gap-4 uppercase italic border-2 border-white/20 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-4xl font-black">refresh</span>
+                    Cambia snack
+                  </button>
                 </motion.div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-12"><button onClick={() => handleHoFame()} className="w-full h-64 rounded-3xl bg-amber-500 text-[#050a05] font-black text-5xl shadow-[0_30px_70px_rgba(245,158,11,0.3)] active:scale-95 transition-all border-8 border-white/20 flex flex-col items-center justify-center gap-6 group"><span className="material-symbols-outlined text-[8rem] group-hover:scale-110 transition-transform duration-300">emoji_food_beverage</span>DIMMELO TU!</button></div>
+                <div className="flex flex-col items-center justify-center py-12">
+                  <button
+                    onClick={() => handleHoFame()}
+                    className="w-full h-64 rounded-3xl bg-amber-500 text-[#050a05] font-black text-5xl shadow-[0_30px_70px_rgba(245,158,11,0.3)] active:scale-95 transition-all border-8 border-white/20 flex flex-col items-center justify-center gap-6 group"
+                  >
+                    <span className="material-symbols-outlined text-[8rem] group-hover:scale-110 transition-transform duration-300">emoji_food_beverage</span>
+                    DIMMELO TU!
+                  </button>
+                </div>
               )}
             </main>
           </motion.div>
