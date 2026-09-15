@@ -10,7 +10,7 @@ import ConfirmMealModal from '@/components/ConfirmMealModal';
 import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
 import MenuAdvisorModal from '@/components/MenuAdvisorModal';
-import { syncMealToGoogleHealth, deleteMealFromGoogleHealth } from '@/lib/google-health';
+import { syncMealToGoogleHealth, deleteMealFromGoogleHealth, resyncDayWithGoogleHealth, isGoogleHealthConnected } from '@/lib/google-health';
 import {
   AreaChart,
   Area,
@@ -63,9 +63,12 @@ export default function Home() {
   const [weightViewReady, setWeightViewReady] = useState(false);
   const [showMenuAdvisor, setShowMenuAdvisor] = useState(false);
   const [healthToast, setHealthToast] = useState(null);
+  const [isResyncing, setIsResyncing] = useState(false);
+  const [healthConnected, setHealthConnected] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
+    setHealthConnected(isGoogleHealthConnected());
   }, []);
 
   useEffect(() => {
@@ -232,6 +235,34 @@ export default function Home() {
         console.error("Errore eliminazione pasto:", err);
         alert("Errore durante l'eliminazione: " + err.message);
       }
+    }
+  };
+
+  const handleResyncGoogleHealth = async () => {
+    if (isResyncing) return;
+    setIsResyncing(true);
+    try {
+      const result = await resyncDayWithGoogleHealth(selectedDate, meals);
+      // Aggiorna gli id su Firestore per i pasti sincronizzati
+      for (const sm of result.syncedMeals) {
+        if (sm.googleHealthDataPointName) {
+          await updateMeal(sm.id, { googleHealthDataPointName: sm.googleHealthDataPointName });
+        }
+      }
+      setHealthToast({
+        type: 'success',
+        message: `Pixel Watch riallineato! ${result.syncedCount} pasti inviati (${result.deletedCount} duplicati rimossi)`
+      });
+      setTimeout(() => setHealthToast(null), 5000);
+    } catch (err) {
+      console.error("Resync error:", err);
+      setHealthToast({
+        type: 'warning',
+        message: `Errore riallineamento: ${err.message}`
+      });
+      setTimeout(() => setHealthToast(null), 5000);
+    } finally {
+      setIsResyncing(false);
     }
   };
 
@@ -652,7 +683,25 @@ export default function Home() {
                 )}
 
                 <div className="px-6 pb-6 mt-6">
-                  <div className="flex justify-between items-end mb-6 px-2"><h3 className="text-[#111811] dark:text-white text-5xl font-black italic uppercase tracking-tighter">I Tuoi Pasti</h3><button className="text-primary text-2xl font-black uppercase underline decoration-[6px] underline-offset-[12px] active:scale-95 transition-transform">Tutti i pasti</button></div>
+                  <div className="flex justify-between items-center mb-6 px-2 gap-4 flex-wrap">
+                    <h3 className="text-[#111811] dark:text-white text-5xl font-black italic uppercase tracking-tighter">I Tuoi Pasti</h3>
+                    <div className="flex items-center gap-4">
+                      {healthConnected && (
+                        <button
+                          type="button"
+                          onClick={handleResyncGoogleHealth}
+                          disabled={isResyncing}
+                          className="px-5 py-3 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-black text-xl flex items-center gap-2 active:scale-95 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                          title="Rimuovi duplicati e riallinea con Pixel Watch"
+                        >
+                          <span className={`material-symbols-outlined text-3xl ${isResyncing ? 'animate-spin' : ''}`}>
+                            {isResyncing ? 'progress_activity' : 'sync'}
+                          </span>
+                          <span>{isResyncing ? 'Riallineo...' : 'Riallinea Pixel Watch'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <div className="space-y-8">
                     {meals.length === 0 ? (
                       <div className="flex flex-col items-center justify-center p-10 bg-white dark:bg-background-dark/30 rounded-3xl border-4 border-dashed border-[#dbe6db] dark:border-white/10 opacity-60"><span className="material-symbols-outlined text-5xl mb-6 text-[#618961]">flatware</span><p className="text-4xl font-black text-[#618961] italic">Nessun pasto registrato oggi.</p></div>
