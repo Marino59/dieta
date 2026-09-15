@@ -10,7 +10,7 @@ import ConfirmMealModal from '@/components/ConfirmMealModal';
 import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
 import MenuAdvisorModal from '@/components/MenuAdvisorModal';
-import { syncMealToGoogleHealth, deleteMealFromGoogleHealth, resyncDayWithGoogleHealth, isGoogleHealthConnected } from '@/lib/google-health';
+import { syncMealToGoogleHealth, deleteMealFromGoogleHealth, resyncDayWithGoogleHealth, isGoogleHealthConnected, connectGoogleHealth } from '@/lib/google-health';
 import {
   AreaChart,
   Area,
@@ -242,6 +242,10 @@ export default function Home() {
     if (isResyncing) return;
     setIsResyncing(true);
     try {
+      if (!isGoogleHealthConnected()) {
+        await connectGoogleHealth();
+        setHealthConnected(true);
+      }
       const result = await resyncDayWithGoogleHealth(selectedDate, meals);
       // Aggiorna gli id su Firestore per i pasti sincronizzati
       for (const sm of result.syncedMeals) {
@@ -685,22 +689,18 @@ export default function Home() {
                 <div className="px-6 pb-6 mt-6">
                   <div className="flex justify-between items-center mb-6 px-2 gap-4 flex-wrap">
                     <h3 className="text-[#111811] dark:text-white text-5xl font-black italic uppercase tracking-tighter">I Tuoi Pasti</h3>
-                    <div className="flex items-center gap-4">
-                      {healthConnected && (
-                        <button
-                          type="button"
-                          onClick={handleResyncGoogleHealth}
-                          disabled={isResyncing}
-                          className="px-5 py-3 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-black text-xl flex items-center gap-2 active:scale-95 transition-all shadow-sm cursor-pointer disabled:opacity-50"
-                          title="Rimuovi duplicati e riallinea con Pixel Watch"
-                        >
-                          <span className={`material-symbols-outlined text-3xl ${isResyncing ? 'animate-spin' : ''}`}>
-                            {isResyncing ? 'progress_activity' : 'sync'}
-                          </span>
-                          <span>{isResyncing ? 'Riallineo...' : 'Riallinea Pixel Watch'}</span>
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleResyncGoogleHealth}
+                      disabled={isResyncing}
+                      className="px-5 py-3 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-black text-xl flex items-center gap-2 active:scale-95 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                      title="Rimuovi duplicati e riallinea con Pixel Watch"
+                    >
+                      <span className={`material-symbols-outlined text-3xl ${isResyncing ? 'animate-spin' : ''}`}>
+                        {isResyncing ? 'progress_activity' : 'sync'}
+                      </span>
+                      <span>{isResyncing ? 'Riallineo...' : 'Riallinea Pixel Watch'}</span>
+                    </button>
                   </div>
                   <div className="space-y-8">
                     {meals.length === 0 ? (
