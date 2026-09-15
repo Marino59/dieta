@@ -69,6 +69,12 @@ export default function Home() {
   useEffect(() => {
     setIsMounted(true);
     setHealthConnected(isGoogleHealthConnected());
+
+    const handleNavHome = () => {
+      setCurrentView('dashboard');
+    };
+    window.addEventListener('nav-home', handleNavHome);
+    return () => window.removeEventListener('nav-home', handleNavHome);
   }, []);
 
   useEffect(() => {
@@ -955,10 +961,8 @@ export default function Home() {
             exit="exit"
             className="w-full min-h-screen bg-[#0a0f0a] flex flex-col"
           >
-            <header className="flex items-center justify-between px-6 py-6 sticky top-1 bg-[#0a0f0a]/90 backdrop-blur-2xl z-30 border-b border-white/5">
-              <button onClick={() => setCurrentView('dashboard')} className="flex items-center gap-6 text-primary font-black text-3xl bg-primary/10 px-6 py-6 rounded-2xl active:scale-90 transition-transform"><ChevronLeft size={50} /> DASHBOARD</button>
+            <header className="flex items-center justify-center px-6 py-6 sticky top-1 bg-[#0a0f0a]/90 backdrop-blur-2xl z-30 border-b border-white/5">
               <h1 className="text-5xl font-black italic uppercase tracking-tighter text-primary drop-shadow-[0_0_15px_rgba(19,236,19,0.3)]">HO FAME</h1>
-              <div className="w-10" />
             </header>
             <main className="flex-1 px-4 sm:px-6 py-6 max-w-2xl mx-auto w-full pb-36">
               {!hungryAdvice && loadingHungry ? (

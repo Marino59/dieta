@@ -40,7 +40,14 @@ export default function BottomNav() {
             {navItems.map((item) => (
                 <button
                     key={item.name}
-                    onClick={() => router.push(item.path)}
+                    onClick={() => {
+                        if (item.name === 'HOME') {
+                            window.dispatchEvent(new CustomEvent('nav-home'));
+                            router.push('/');
+                        } else {
+                            router.push(item.path);
+                        }
+                    }}
                     className={cn(
                         "relative flex-1 flex flex-col items-center justify-center transition-all active:scale-95 gap-1",
                         item.isActive ? "text-white" : "text-[#618961] dark:text-white/30 hover:text-white/50"
