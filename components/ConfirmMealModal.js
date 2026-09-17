@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 
 import { Check, X, Minus, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { updateAnalysisFromText } from '@/lib/ai';
-import { isGoogleHealthConnected, isGoogleHealthAutoSync } from '@/lib/google-health';
+import { isGoogleHealthConnected, isGoogleHealthAutoSync, isGoogleHealthTokenValid } from '@/lib/google-health';
 
 export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoading, defaultDate }) {
     const [quantity, setQuantity] = useState(mealData.quantity || 100);
     const [analysis, setAnalysis] = useState(mealData.analysis || '');
     const [mounted, setMounted] = useState(false);
     const [healthAvailable, setHealthAvailable] = useState(false);
+    const [tokenValid, setTokenValid] = useState(false);
     const [syncToHealth, setSyncToHealth] = useState(false);
 
     // Initialize date logic
@@ -45,10 +46,11 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
     useEffect(() => {
         setMounted(true);
         const connected = isGoogleHealthConnected();
+        const valid = isGoogleHealthTokenValid();
+        const autoSync = isGoogleHealthAutoSync();
         setHealthAvailable(connected);
-        if (connected) {
-            setSyncToHealth(isGoogleHealthAutoSync());
-        }
+        setTokenValid(valid);
+        setSyncToHealth(connected && autoSync && valid);
         // Lock body scroll
         document.body.style.overflow = 'hidden';
 
@@ -220,7 +222,13 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
                     {healthAvailable && (
                         <button
                             type="button"
-                            onClick={() => setSyncToHealth(prev => !prev)}
+                            onClick={() => {
+                                if (!tokenValid) {
+                                    alert('Sessione Pixel Watch scaduta. Riconnetti l\'account dalla pagina Profilo per riattivare la sincronizzazione.');
+                                    return;
+                                }
+                                setSyncToHealth(prev => !prev);
+                            }}
                             className={`w-full p-8 rounded-[2.5rem] border-4 transition-all flex items-center justify-between gap-4 active:scale-98 cursor-pointer ${
                                 syncToHealth
                                     ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
@@ -232,7 +240,11 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
                                 <div className="text-left">
                                     <div className="text-3xl font-black text-white">Pixel Watch / Google Health</div>
                                     <div className="text-xl font-bold opacity-75">
-                                        {syncToHealth ? 'Sincronizzazione attiva per questo pasto' : 'Tocca per inviare a Pixel Watch'}
+                                        {!tokenValid 
+                                            ? 'Sessione scaduta (riconnetti dal Profilo)' 
+                                            : syncToHealth 
+                                                ? 'Sincronizzazione attiva per questo pasto' 
+                                                : 'Tocca per inviare a Pixel Watch'}
                                     </div>
                                 </div>
                             </div>

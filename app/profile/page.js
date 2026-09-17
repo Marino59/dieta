@@ -10,7 +10,8 @@ import {
     connectGoogleHealth,
     disconnectGoogleHealth,
     isGoogleHealthAutoSync,
-    setGoogleHealthAutoSync
+    setGoogleHealthAutoSync,
+    isGoogleHealthTokenValid
 } from '@/lib/google-health';
 
 const ACTIVITY_LEVELS = [
@@ -53,12 +54,14 @@ export default function ProfilePage() {
 
     // Pixel Watch / Google Health Integration
     const [healthConnected, setHealthConnected] = useState(false);
+    const [healthTokenValid, setHealthTokenValid] = useState(false);
     const [healthAutoSync, setHealthAutoSync] = useState(true);
     const [connectingHealth, setConnectingHealth] = useState(false);
     const [healthFeedback, setHealthFeedback] = useState('');
 
     useEffect(() => {
         setHealthConnected(isGoogleHealthConnected());
+        setHealthTokenValid(isGoogleHealthTokenValid());
         setHealthAutoSync(isGoogleHealthAutoSync());
     }, []);
 
@@ -66,8 +69,9 @@ export default function ProfilePage() {
         setConnectingHealth(true);
         setHealthFeedback('');
         try {
-            await connectGoogleHealth();
+            await connectGoogleHealth(user?.email);
             setHealthConnected(true);
+            setHealthTokenValid(true);
             setHealthFeedback('Collegato con successo al Pixel Watch / Google Health!');
         } catch (err) {
             console.error('Connection error:', err);
@@ -81,6 +85,7 @@ export default function ProfilePage() {
         if (confirm('Vuoi scollegare l\'integrazione con Pixel Watch / Google Health?')) {
             disconnectGoogleHealth();
             setHealthConnected(false);
+            setHealthTokenValid(false);
             setHealthFeedback('Integrazione scollegata.');
         }
     };
@@ -425,12 +430,16 @@ export default function ProfilePage() {
                             <h2 className="font-black text-3xl uppercase tracking-widest italic">Pixel Watch / Google Health</h2>
                         </div>
                         <span className={`px-5 py-2 rounded-full text-lg font-black tracking-wide uppercase flex items-center gap-2 ${
-                            healthConnected 
-                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' 
-                                : 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-300'
+                            !healthConnected 
+                                ? 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-300'
+                                : healthTokenValid
+                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' 
+                                    : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
                         }`}>
-                            <span className={`w-3 h-3 rounded-full ${healthConnected ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                            {healthConnected ? 'Connesso' : 'Non collegato'}
+                            <span className={`w-3 h-3 rounded-full ${
+                                !healthConnected ? 'bg-gray-400' : healthTokenValid ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                            }`}></span>
+                            {!healthConnected ? 'Non collegato' : healthTokenValid ? 'Connesso' : 'Sessione scaduta'}
                         </span>
                     </div>
 
@@ -462,6 +471,18 @@ export default function ProfilePage() {
                         </button>
                     ) : (
                         <div className="space-y-6 pt-2 border-t-2 border-[#dbe6db] dark:border-white/10">
+                            {/* Reconnect button if token is expired */}
+                            {!healthTokenValid && (
+                                <button
+                                    type="button"
+                                    onClick={handleConnectHealth}
+                                    disabled={connectingHealth}
+                                    className="w-full py-4 bg-amber-500 text-black rounded-2xl font-black text-xl flex items-center justify-center gap-3 shadow-md hover:bg-amber-400 active:scale-95 transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-3xl">sync</span>
+                                    RINNOVA SESSIONE GOOGLE (TOKEN SCADUTO)
+                                </button>
+                            )}
                             {/* Auto Sync Toggle */}
                             <label className="flex items-center justify-between cursor-pointer p-4 rounded-2xl bg-[#f6f8f6] dark:bg-black/20 hover:bg-black/5 transition-colors">
                                 <div>

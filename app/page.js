@@ -10,7 +10,7 @@ import ConfirmMealModal from '@/components/ConfirmMealModal';
 import ProductEvaluationModal from '@/components/ProductEvaluationModal';
 import CameraInput from '@/components/CameraInput';
 import MenuAdvisorModal from '@/components/MenuAdvisorModal';
-import { syncMealToGoogleHealth, deleteMealFromGoogleHealth, resyncDayWithGoogleHealth, syncWeightToGoogleHealth, deleteWeightFromGoogleHealth, isGoogleHealthConnected, connectGoogleHealth } from '@/lib/google-health';
+import { syncMealToGoogleHealth, deleteMealFromGoogleHealth, resyncDayWithGoogleHealth, syncWeightToGoogleHealth, deleteWeightFromGoogleHealth, isGoogleHealthConnected, isGoogleHealthAutoSync, isGoogleHealthTokenValid, connectGoogleHealth } from '@/lib/google-health';
 import {
   AreaChart,
   Area,
@@ -179,7 +179,7 @@ export default function Home() {
       }
 
       // Sincronizzazione nuovo/modificato con Pixel Watch / Google Health
-      if (mealData.syncToGoogleHealth) {
+      if (mealData.syncToGoogleHealth && isGoogleHealthConnected() && isGoogleHealthTokenValid()) {
         try {
           const syncRes = await syncMealToGoogleHealth(mealData);
           if (syncRes?.dataPointName) {
@@ -289,8 +289,8 @@ export default function Home() {
       const timestamp = new Date(`${weightDate}T${weightTime}`);
       const savedWeight = await addWeight({ weight: sanitizedWeight, created_at: timestamp.toISOString() });
 
-      // Se Google Health / Pixel Watch è collegato, sincronizziamo il peso
-      if (isGoogleHealthConnected()) {
+      // Se Google Health / Pixel Watch è collegato ed il token è valido, sincronizziamo il peso
+      if (isGoogleHealthConnected() && isGoogleHealthAutoSync() && isGoogleHealthTokenValid()) {
         try {
           const syncResult = await syncWeightToGoogleHealth({
             weight: sanitizedWeight,

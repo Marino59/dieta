@@ -259,17 +259,11 @@ export default function CameraInput({ onMealAdded, onMealIdentified, onProductEv
 
                 {/* BARCODE MODE */}
                 {activeTab === 'barcode' && (
-                    <div className="rounded-[4rem] overflow-hidden border-8 border-amber-500/30 bg-black relative aspect-square shadow-2xl">
+                    <div className="w-full rounded-[3.5rem] overflow-hidden border-4 border-amber-500/40 bg-black shadow-2xl relative min-h-[460px]">
                         <BarcodeScanner
                             onDetected={handleBarcodeDetected}
-                            onClose={() => setActiveTab('text')} // Fallback if they close it
+                            onClose={() => setActiveTab('text')}
                         />
-                        <div className="absolute inset-0 pointer-events-none border-[12px] border-amber-500/50 rounded-[4rem] z-10"></div>
-                        <div className="absolute bottom-10 left-0 right-0 text-center z-20">
-                            <span className="bg-amber-500/90 text-white px-12 py-6 rounded-[2rem] text-4xl font-[900] backdrop-blur-md shadow-xl border-4 border-white/20 uppercase tracking-tighter">
-                                Inquadra il codice
-                            </span>
-                        </div>
                     </div>
                 )}
             </div>
