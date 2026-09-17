@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Camera, Loader2, Star, AlertTriangle, ChefHat, RefreshCw } from 'lucide-react';
+import { X, Camera, Loader2, Star, AlertTriangle, RefreshCw } from 'lucide-react';
 import { analyzeMenuImage } from '@/lib/ai';
 
 export default function MenuAdvisorModal({ onClose, profile, caloriesConsumed = 0 }) {
@@ -13,6 +13,15 @@ export default function MenuAdvisorModal({ onClose, profile, caloriesConsumed = 
     const fileInputRef = useRef(null);
 
     const remaining = (profile?.targetCalories || 2000) - caloriesConsumed;
+
+    // Chiudi il modal quando l'utente preme il tasto HOME dalla barra di navigazione
+    useEffect(() => {
+        const handleHome = () => {
+            if (onClose) onClose();
+        };
+        window.addEventListener('nav-home', handleHome);
+        return () => window.removeEventListener('nav-home', handleHome);
+    }, [onClose]);
 
     const handleFileSelect = (e) => {
         const file = e.target.files?.[0];
@@ -75,25 +84,23 @@ export default function MenuAdvisorModal({ onClose, profile, caloriesConsumed = 
         >
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-safe pt-6 pb-4 border-b border-white/10">
-                <div className="flex items-center gap-3">
-                    <ChefHat className="text-green-400" size={28} strokeWidth={2.5} />
-                    <div>
-                        <h2 className="text-white font-black text-2xl tracking-tight">Consulente Menu</h2>
-                        <p className="text-green-400 text-sm font-bold">
-                            {remaining > 0 ? `${remaining} kcal rimanenti oggi` : 'Budget calorico esaurito'}
-                        </p>
-                    </div>
+                <div>
+                    <span className="text-xs font-black text-green-400/60 uppercase tracking-[0.25em]">Budget Giornaliero</span>
+                    <p className="text-green-400 text-2xl font-black tracking-tight">
+                        {remaining > 0 ? `${remaining} kcal rimanenti` : 'Budget esaurito'}
+                    </p>
                 </div>
                 <button
                     onClick={onClose}
-                    className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center active:scale-90 transition-transform"
+                    className="w-16 h-16 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-90 transition-all flex items-center justify-center border border-white/15 shadow-xl cursor-pointer"
+                    title="Chiudi"
                 >
-                    <X className="text-white" size={22} />
+                    <X className="text-white" size={32} strokeWidth={2.5} />
                 </button>
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+            <div className="flex-1 overflow-y-auto p-6 pb-48 flex flex-col gap-6">
                 <AnimatePresence mode="wait">
 
                     {/* STEP: CAPTURE */}

@@ -72,6 +72,11 @@ export default function Home() {
 
     const handleNavHome = () => {
       setCurrentView('dashboard');
+      setShowMenuAdvisor(false);
+      setInputMode(null);
+      setPendingMealData(null);
+      setEditingMeal(null);
+      setIsAddingWeight(false);
     };
     window.addEventListener('nav-home', handleNavHome);
     return () => window.removeEventListener('nav-home', handleNavHome);
