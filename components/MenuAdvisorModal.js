@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Camera, Loader2, Star, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Camera, Loader2, Star, AlertTriangle, RefreshCw } from 'lucide-react';
 import { analyzeMenuImage } from '@/lib/ai';
 
 export default function MenuAdvisorModal({ onClose, profile, caloriesConsumed = 0 }) {
@@ -82,39 +82,22 @@ export default function MenuAdvisorModal({ onClose, profile, caloriesConsumed = 
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex flex-col bg-[#0d1a0d]"
         >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-safe pt-6 pb-4 border-b border-white/10">
-                <div>
-                    <span className="text-xs font-black text-green-400/60 uppercase tracking-[0.25em]">Budget Giornaliero</span>
-                    <p className="text-green-400 text-2xl font-black tracking-tight">
-                        {remaining > 0 ? `${remaining} kcal rimanenti` : 'Budget esaurito'}
-                    </p>
-                </div>
-                <button
-                    onClick={onClose}
-                    className="w-16 h-16 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-90 transition-all flex items-center justify-center border border-white/15 shadow-xl cursor-pointer"
-                    title="Chiudi"
-                >
-                    <X className="text-white" size={32} strokeWidth={2.5} />
-                </button>
-            </div>
-
             {/* Body */}
-            <div className="flex-1 overflow-y-auto p-6 pb-48 flex flex-col gap-6">
+            <div className="flex-1 overflow-y-auto p-6 pt-12 pb-48 flex flex-col gap-8">
                 <AnimatePresence mode="wait">
 
                     {/* STEP: CAPTURE */}
                     {step === 'capture' && (
                         <motion.div key="capture"
                             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-                            className="flex flex-col items-center gap-6"
+                            className="flex flex-col items-center gap-8 mt-2"
                         >
                             <input
                                 type="file" accept="image/*" capture="environment"
                                 ref={fileInputRef} className="hidden"
                                 onChange={handleFileSelect}
                             />
-                            <p className="text-slate-300 text-center text-lg font-semibold leading-relaxed">
+                            <p className="text-white text-center text-3xl sm:text-4xl font-black leading-snug tracking-tight px-4 drop-shadow-md">
                                 Fotografa la carta del ristorante e ti dirò cosa ordinare in base alle tue calorie e al tuo obiettivo.
                             </p>
                             <button
