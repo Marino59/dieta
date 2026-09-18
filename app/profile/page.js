@@ -11,7 +11,8 @@ import {
     disconnectGoogleHealth,
     isGoogleHealthAutoSync,
     setGoogleHealthAutoSync,
-    isGoogleHealthTokenValid
+    isGoogleHealthTokenValid,
+    ensureGoogleHealthTokenValid
 } from '@/lib/google-health';
 
 const ACTIVITY_LEVELS = [
@@ -60,9 +61,19 @@ export default function ProfilePage() {
     const [healthFeedback, setHealthFeedback] = useState('');
 
     useEffect(() => {
-        setHealthConnected(isGoogleHealthConnected());
-        setHealthTokenValid(isGoogleHealthTokenValid());
+        const connected = isGoogleHealthConnected();
+        const valid = isGoogleHealthTokenValid();
+        setHealthConnected(connected);
+        setHealthTokenValid(valid);
         setHealthAutoSync(isGoogleHealthAutoSync());
+
+        if (connected && !valid) {
+            ensureGoogleHealthTokenValid().then((refreshed) => {
+                if (refreshed) {
+                    setHealthTokenValid(true);
+                }
+            });
+        }
     }, []);
 
     const handleConnectHealth = async () => {

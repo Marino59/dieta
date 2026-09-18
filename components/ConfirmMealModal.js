@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 import { Check, X, Minus, Plus, Loader2, RefreshCw } from 'lucide-react';
 import { updateAnalysisFromText } from '@/lib/ai';
-import { isGoogleHealthConnected, isGoogleHealthAutoSync, isGoogleHealthTokenValid } from '@/lib/google-health';
+import { isGoogleHealthConnected, isGoogleHealthAutoSync, isGoogleHealthTokenValid, getOrRefreshGoogleHealthToken, connectGoogleHealth } from '@/lib/google-health';
 
 export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoading, defaultDate }) {
     const [quantity, setQuantity] = useState(mealData.quantity || 100);
@@ -50,7 +50,19 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
         const autoSync = isGoogleHealthAutoSync();
         setHealthAvailable(connected);
         setTokenValid(valid);
-        setSyncToHealth(connected && autoSync && valid);
+        setSyncToHealth(connected && autoSync);
+
+        // Se collegato ma il token in memoria è scaduto, tenta silent refresh in background
+        if (connected && !valid) {
+            getOrRefreshGoogleHealthToken(false)
+                .then(() => {
+                    setTokenValid(true);
+                })
+                .catch(() => {
+                    setTokenValid(false);
+                });
+        }
+
         // Lock body scroll
         document.body.style.overflow = 'hidden';
 
@@ -222,9 +234,16 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
                     {healthAvailable && (
                         <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                                 if (!tokenValid) {
-                                    alert('Sessione Pixel Watch scaduta. Riconnetti l\'account dalla pagina Profilo per riattivare la sincronizzazione.');
+                                    try {
+                                        await connectGoogleHealth();
+                                        setTokenValid(true);
+                                        setSyncToHealth(true);
+                                    } catch (err) {
+                                        console.error('Errore autorizzazione Google Health:', err);
+                                        alert('Impossibile autenticare Google Health: ' + (err.message || 'Riprova'));
+                                    }
                                     return;
                                 }
                                 setSyncToHealth(prev => !prev);
@@ -241,7 +260,7 @@ export default function ConfirmMealModal({ mealData, onConfirm, onCancel, isLoad
                                     <div className="text-3xl font-black text-white">Pixel Watch / Google Health</div>
                                     <div className="text-xl font-bold opacity-75">
                                         {!tokenValid 
-                                            ? 'Sessione scaduta (riconnetti dal Profilo)' 
+                                            ? 'Sessione da rinnovare (tocca per autorizzare subito)' 
                                             : syncToHealth 
                                                 ? 'Sincronizzazione attiva per questo pasto' 
                                                 : 'Tocca per inviare a Pixel Watch'}

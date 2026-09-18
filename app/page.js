@@ -184,7 +184,7 @@ export default function Home() {
       }
 
       // Sincronizzazione nuovo/modificato con Pixel Watch / Google Health
-      if (mealData.syncToGoogleHealth && isGoogleHealthConnected() && isGoogleHealthTokenValid()) {
+      if (mealData.syncToGoogleHealth && isGoogleHealthConnected()) {
         try {
           const syncRes = await syncMealToGoogleHealth(mealData);
           if (syncRes?.dataPointName) {
@@ -253,11 +253,27 @@ export default function Home() {
     if (isResyncing) return;
     setIsResyncing(true);
     try {
-      if (!isGoogleHealthConnected()) {
+      // Se non collegato oppure il token in cache è scaduto, avvia autorizzazione Google
+      if (!isGoogleHealthConnected() || !isGoogleHealthTokenValid()) {
         await connectGoogleHealth();
         setHealthConnected(true);
       }
-      const result = await resyncDayWithGoogleHealth(selectedDate, meals);
+
+      let result;
+      try {
+        result = await resyncDayWithGoogleHealth(selectedDate, meals, true);
+      } catch (firstErr) {
+        const msg = (firstErr?.message || '').toLowerCase();
+        // Se c'è stato un problema di token scaduto o 401, prova il rinnovo interattivo diretto
+        if (msg.includes('scadut') || msg.includes('token') || msg.includes('401') || msg.includes('autorizz') || msg.includes('sessione')) {
+          await connectGoogleHealth();
+          setHealthConnected(true);
+          result = await resyncDayWithGoogleHealth(selectedDate, meals, true);
+        } else {
+          throw firstErr;
+        }
+      }
+
       // Aggiorna gli id su Firestore per i pasti sincronizzati
       for (const sm of result.syncedMeals) {
         if (sm.googleHealthDataPointName) {
@@ -294,8 +310,8 @@ export default function Home() {
       const timestamp = new Date(`${weightDate}T${weightTime}`);
       const savedWeight = await addWeight({ weight: sanitizedWeight, created_at: timestamp.toISOString() });
 
-      // Se Google Health / Pixel Watch è collegato ed il token è valido, sincronizziamo il peso
-      if (isGoogleHealthConnected() && isGoogleHealthAutoSync() && isGoogleHealthTokenValid()) {
+      // Se Google Health / Pixel Watch è collegato, sincronizziamo il peso
+      if (isGoogleHealthConnected() && isGoogleHealthAutoSync()) {
         try {
           const syncResult = await syncWeightToGoogleHealth({
             weight: sanitizedWeight,
@@ -533,7 +549,19 @@ export default function Home() {
             healthToast.type === 'success' ? 'text-emerald-400' : 'text-amber-400'
           }`}>watch</span>
           <span className="text-xl font-black">{healthToast.message}</span>
-          <button onClick={() => setHealthToast(null)} className="ml-2 text-slate-400 hover:text-white text-2xl font-bold">✕</button>
+          {healthToast.action && (
+            <button
+              onClick={() => {
+                const act = healthToast.action;
+                setHealthToast(null);
+                act.onClick();
+              }}
+              className="px-4 py-2 bg-amber-400 text-black font-black rounded-xl text-lg hover:bg-amber-300 active:scale-95 transition-all shadow-md ml-2 whitespace-nowrap cursor-pointer"
+            >
+              {healthToast.action.label}
+            </button>
+          )}
+          <button onClick={() => setHealthToast(null)} className="ml-2 text-slate-400 hover:text-white text-2xl font-bold cursor-pointer">✕</button>
         </div>
       )}
       <AnimatePresence mode="wait" custom={swipeDirection}>
